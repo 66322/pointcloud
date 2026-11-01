@@ -11,10 +11,15 @@ GitHub main是两台电脑和服务器的共同版本。用户手动执行服务
 当前两项正式对照：GPU0有效多视图均值、GPU1首有效视图，完整val，自动汇总。
 代码已准备，暂无这两项的真实改进分数。
 
+当前r02已通过单帧并启动两项正式推理，等待结果，不要重复启动。
+后续长任务默认nohup；需要新批次时，例如：
+
 ~~~bash
-python -m pointcloud_lab.run_views --paths configs/paths.local.json \
-  --out runs/view_assignment_fullval_20261101_r02
+bash scripts/start_view_experiments.sh view_assignment_fullval_20261101_r03
 ~~~
+
+启动信息、PID和父进程日志位于runs/_launch/<run_id>/；
+实际实验产物仍在runs/<run_id>/。
 
 | 目录 | 用途 |
 |---|---|

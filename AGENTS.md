@@ -8,6 +8,10 @@
   actual suspected corruption, not a default experiment step.
 - Keep basic shape/label checks, strict checkpoint loading, explicit GPU0/1,
   and separate outputs. These prevent incorrect results without lengthy prep.
+- User preference: launch all long server experiments with nohup, detached stdin
+  and redirected stdout/stderr, recording PID/log path. Do not recommend a plain
+  foreground launch for a long run. Do not restart an already running experiment
+  simply to change its launch mode.
 
 - GitHub main is the shared source of truth. Pull with --ff-only before work;
   never force-push. Keep experiment code and small evidence in this repository.
