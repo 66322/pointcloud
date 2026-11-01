@@ -52,6 +52,7 @@ def main():
         from .model_init import checkpoint_only_dino_init
         from .training_models import install_treatment, load_full_state
         from .training_data import PairedDataset, EpochSampler, PairedCollator, initialize_worker
+        from .training_setup import configure_optimizer
 
         cfg = default_config_parser(paths["config"], {
             "save_path": str(output), "weight": paths["weight"], "resume": False,
@@ -62,12 +63,7 @@ def main():
         for split in ("train", "val", "test"):
             cfg.data[split].data_root = paths["data_root"]
         cfg.hooks = []  # This adapter owns checkpoints/progress; no extra per-epoch validation.
-        cfg.optimizer.lr = protocol["max_lr"]
-        cfg.param_dicts = [dict(keyword=r"img_enc|block",
-                               lr=protocol["max_lr"] * protocol["block_lr_ratio"])]
-        if cfg.scheduler.type != "OneCycleLR":
-            raise ValueError("This paired protocol expects the existing OneCycleLR scheduler")
-        cfg.scheduler.max_lr = [protocol["max_lr"], protocol["max_lr"] * protocol["block_lr_ratio"]]
+        configure_optimizer(cfg, protocol)
         cfg = default_setup(cfg)
         # Do not multiply the model seed by a performance-related worker count.
         set_seed(protocol["seed"])

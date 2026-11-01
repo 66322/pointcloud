@@ -2,7 +2,9 @@
 
 已有推理r02已完成：mean82.64%，first82.55%。无需重复评测。
 本页启动的是从现有兼容checkpoint开始的真实训练，不是再次推理或环境诊断。
-本地Torch 2.5.1 CPU共28项测试通过；未在H100运行，首次真实更新会检查梯度。
+本地Torch 2.5.1 CPU共29项测试通过，含原版优化器/调度器接口回归。
+r01在优化器构造时因配置类型适配失败，已修复；
+尚未发生H100训练更新。新批次使用r02创建新代码快照，首次真实更新会检查梯度。
 
 ## 启动
 
@@ -10,7 +12,7 @@
 cd /home/jovyan/zzx/pointcloud
 git pull --rebase
 conda activate pointcept-torch2.5.0-cu12.4
-bash scripts/start_training_experiments.sh finetune_stage1_20261101_r01
+bash scripts/start_training_experiments.sh finetune_stage1_20261101_r02
 ~~~
 
 默认协议configs/training/stage1.json：
@@ -30,7 +32,7 @@ GPU0先control，GPU1先gate；每项训练完成释放进程，然后该卡跑�
 ## 保存位置及进度
 
 所有新结果位于：
-/home/jovyan/zzx/pointcloud/runs/finetune_stage1_20261101_r01/
+/home/jovyan/zzx/pointcloud/runs/finetune_stage1_20261101_r02/
 
 - control/train、gate/train、mean/train、camera_dropout/train：config、训练日志、
   trajectory.jsonl、first_step.json、summary.json、model/model_last.pth。
@@ -38,13 +40,13 @@ GPU0先control，GPU1先gate；每项训练完成释放进程，然后该卡跑�
 - 根目录*_train_console.log、*_val_console.log：各阶段终端输出。
 - 根目录comparison.csv、report.md、summary.json：自动汇总，差值以训练control为主。
 - code/、protocol.json、paths.json：启动时的小型代码/配置快照，后续git pull不改变排队任务。
-- runs/_launch/finetune_stage1_20261101_r01/：父队列console.log及pid。
+- runs/_launch/finetune_stage1_20261101_r02/：父队列console.log及pid。
 
 ~~~bash
 cd /home/jovyan/zzx/pointcloud
-tail -n 20 runs/_launch/finetune_stage1_20261101_r01/console.log
-tail -n 10 runs/finetune_stage1_20261101_r01/control_train_console.log
-tail -n 10 runs/finetune_stage1_20261101_r01/gate_train_console.log
+tail -n 20 runs/_launch/finetune_stage1_20261101_r02/console.log
+tail -n 10 runs/finetune_stage1_20261101_r02/control_train_console.log
+tail -n 10 runs/finetune_stage1_20261101_r02/gate_train_console.log
 ~~~
 
 每20次训练步打印实际每步耗时、阻塞取数耗时、loss及ETA。首次模型加载、数据进程
@@ -82,11 +84,11 @@ scheduler、scaler、批次位置及RNG。支持从本实验目录续跑，不�
 
 ~~~bash
 CUDA_VISIBLE_DEVICES=0 nohup python -u -m pointcloud_lab.train \
-  --paths runs/finetune_stage1_20261101_r01/paths.json \
-  --protocol runs/finetune_stage1_20261101_r01/protocol.json \
+  --paths runs/finetune_stage1_20261101_r02/paths.json \
+  --protocol runs/finetune_stage1_20261101_r02/protocol.json \
   --method control --gpu 0 \
-  --out runs/finetune_stage1_20261101_r01/control/train --resume \
-  > runs/finetune_stage1_20261101_r01/control_resume_console.log 2>&1 < /dev/null &
+  --out runs/finetune_stage1_20261101_r02/control/train --resume \
+  > runs/finetune_stage1_20261101_r02/control_resume_console.log 2>&1 < /dev/null &
 ~~~
 
 此命令只续跑control训练，不自动复活已退出的整条队列。
@@ -97,9 +99,9 @@ CUDA_VISIBLE_DEVICES=0 nohup python -u -m pointcloud_lab.train \
 
 ~~~bash
 python -m pointcloud_lab.export_record \
-  --run runs/finetune_stage1_20261101_r01 \
-  --record records/experiments/finetune_stage1_20261101_r01
-git add records/experiments/finetune_stage1_20261101_r01
+  --run runs/finetune_stage1_20261101_r02 \
+  --record records/experiments/finetune_stage1_20261101_r02
+git add records/experiments/finetune_stage1_20261101_r02
 git commit -m "Record paired DITR fine-tuning experiments"
 git pull --rebase
 git -c credential.helper= push origin main

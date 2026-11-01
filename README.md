@@ -18,11 +18,11 @@ H100上的等价性和加速幅度尚待新入口首次单帧确认及后续正�
 当前r02不会自动使用新代码，不为测速度重跑完整val。
 训练入口已就绪，见[训练命令](docs/TRAINING_RUNBOOK.md)和[实验总表](docs/EXPERIMENT_MASTER.md)。
 首批为同预算的control/gate/mean/camera_dropout，各2 epoch，两个GPU自动排队，
-第一次真实更新检查后直接继续；本地28项测试通过，H100训练尚待用户执行。
+第一次真实更新检查后直接继续；r01在优化器配置类型适配处失败，已修复，尚无H100参数更新。
 启动首批训练，默认nohup：
 
 ~~~bash
-bash scripts/start_training_experiments.sh finetune_stage1_20261101_r01
+bash scripts/start_training_experiments.sh finetune_stage1_20261101_r02
 ~~~
 
 启动信息、PID和父进程日志位于runs/_launch/<run_id>/；
