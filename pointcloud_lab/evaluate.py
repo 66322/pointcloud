@@ -16,14 +16,25 @@ def main():
     parser.add_argument("--gpu", required=True, choices=("0", "1"))
     parser.add_argument("--tokens", required=True, help="JSON list; same for every paired condition")
     parser.add_argument("--expected-frames", type=int)
+    parser.add_argument("--io-workers", type=int, default=2,
+                        help="Parallel raw reads only; stochastic transforms remain sequential")
+    parser.add_argument("--prefetch-frames", type=int, default=1)
+    parser.add_argument("--image-cache", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--reference-predictions",
+                        help="Optional existing result directory; same one-frame point prediction comparison")
     parser.add_argument("--allow-upstream-drift", action="store_true",
                         help="Compatibility option; upstream commit is now recorded, not gated")
     args = parser.parse_args()
+    if args.io_workers < 0 or args.prefetch_frames < 0:
+        parser.error("I/O workers and prefetch frames must be nonnegative")
     # Must happen before ANY import of torch, timm, or upstream pointcept.
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     paths, experiment, tokens = read_json(args.paths), read_json(args.experiment), read_json(args.tokens)
     if args.expected_frames is not None and len(tokens) != args.expected_frames:
         raise ValueError("Token count differs from --expected-frames")
+    if args.reference_predictions and len(tokens) != 1:
+        parser.error("Reference comparison is only for the existing single smoke frame")
+    reference_predictions = Path(args.reference_predictions).resolve() if args.reference_predictions else None
     allowed = {"id", "assignment", "camera_order", "dx", "dy", "seed", "description"}
     if set(experiment) - allowed:
         raise ValueError("Unrecognized experiment keys")
@@ -40,6 +51,8 @@ def main():
         os.environ.setdefault("HF_HOME", paths["hf_cache"])
         os.environ.setdefault("HF_HUB_OFFLINE", "1")
         os.environ.setdefault("NO_ALBUMENTATIONS_UPDATE", "1")
+        for variable in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
+            os.environ.setdefault(variable, "1")
         sys.path.insert(0, paths["ditr_root"])
         # Preserve all relative paths expected by author's saved configuration.
         os.chdir(paths["ditr_root"])
@@ -49,6 +62,10 @@ def main():
         from pointcept.datasets import build_dataset
         from .interventions import assign_variant
         from .model_init import checkpoint_only_dino_init
+        from .data_pipeline import (
+            FrameImageCache, TimedFrameLoader, OrderedRawReader, OrderedFramePrefetch,
+        )
+        from pointcept.utils.logger import get_root_logger
 
         cfg = default_config_parser(paths["config"], {
             "save_path": output.as_posix(), "weight": paths["weight"],
@@ -63,6 +80,9 @@ def main():
         original = importlib.import_module(
             "pointcept.models.point_transformer_v3.point_transformer_v3m1_image"
         )
+        image_cache = FrameImageCache(original.get_image_feat) if args.image_cache else None
+        if image_cache is not None:
+            original.get_image_feat = image_cache
         if mode != "official":
             def intervention(data, feats, patch, missing=None):
                 return assign_variant(
@@ -100,10 +120,20 @@ def main():
             def build_test_loader(self):
                 dataset = build_dataset(cfg.data.test)
                 dataset.data_list = select_infos(dataset.data_list, tokens=tokens)
-                return torch.utils.data.DataLoader(
-                    dataset, batch_size=1, shuffle=False, num_workers=0,
-                    collate_fn=self.__class__.collate_fn, pin_memory=True,
+                raw_reader = None
+                if args.io_workers:
+                    if type(dataset).__name__ != "NuScenesDataset":
+                        raise ValueError("Raw I/O prefetch has only been audited for NuScenesDataset")
+                    raw_reader = OrderedRawReader(dataset.get_data, len(dataset), args.io_workers)
+                    dataset.get_data = raw_reader
+                loader = torch.utils.data.DataLoader(
+                    dataset, collate_fn=self.__class__.collate_fn,
+                    batch_size=1, shuffle=False, num_workers=0, pin_memory=True,
                 )
+                loader = OrderedFramePrefetch(
+                    loader, args.prefetch_frames, raw_reader.close if raw_reader else None,
+                )
+                return TimedFrameLoader(loader, image_cache, get_root_logger().info)
 
         write_json(output / "provenance.json", {
             "created_at": timestamp(), "experiment": experiment, "paths": paths,
@@ -112,6 +142,13 @@ def main():
             "tokens": tokens,
             "torch": torch.__version__, "physical_gpu_requested": args.gpu,
             "kind": "evaluation_intervention_not_retrained_method",
+            "execution": {
+                "raw_io_threads": args.io_workers, "prefetch_frames": args.prefetch_frames,
+                "dataloader_processes": 0, "transform_order_and_rng": "original sequential",
+                "cpu_thread_environment": {k: os.environ.get(k) for k in
+                                           ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS")},
+                "frame_image_cache": args.image_cache, "cache_match": "exact torch.equal; no hashes",
+            },
         })
         tester = LabTester(cfg=cfg)
         if audit["dino_trainable_elements"] or audit["dino_training_flag"]:
@@ -126,11 +163,26 @@ def main():
         prediction_count = sum(1 for _ in (output / "result").glob("*_pred.npy"))
         if prediction_count != len(tokens):
             raise RuntimeError("Incomplete output prediction cache")
+        if reference_predictions:
+            import numpy as np
+            filename = f"{tokens[0]}_pred.npy"
+            same = np.array_equal(
+                np.load(reference_predictions / filename, allow_pickle=False),
+                np.load(output / "result" / filename, allow_pickle=False),
+            )
+            write_json(output / "smoke_equivalence.json", {
+                "identical_point_predictions": same, "reference": str(reference_predictions / filename),
+                "kind": "same single frame, no extra inference pass",
+            })
+            if not same:
+                raise RuntimeError("Fast single-frame prediction differs from reference")
         write_json(output / "runtime.json", {
             "wall_seconds_with_io_tta_logging": duration,
             "frames": prediction_count,
             "peak_allocated_bytes": torch.cuda.max_memory_allocated(),
             "timing_note": "End-to-end tester wall time, not isolated model latency",
+            "pipeline": tester.test_loader.stats(),
+            "image_cache": image_cache.stats() if image_cache is not None else None,
         })
         from .results import read_test_metrics
         write_json(output / "summary.json", read_test_metrics(output / "test.log"))

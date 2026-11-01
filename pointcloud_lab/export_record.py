@@ -9,6 +9,7 @@ ALLOWED = (
     "status.json", "preflight.json", "summary.json", "confusions.json", "per_class.csv",
     "report.md", "provenance.json", "model_audit.json", "runtime.json", "tokens.json",
     "comparison.csv",
+    "smoke_equivalence.json",
 )
 
 

@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-if [[ $# -ne 1 ]]; then
-  echo "Usage: bash scripts/start_view_experiments.sh DESCRIPTIVE_RUN_ID" >&2
+if [[ $# -lt 1 ]]; then
+  echo "Usage: bash scripts/start_view_experiments.sh DESCRIPTIVE_RUN_ID [run_views options]" >&2
   exit 2
 fi
 run_id="$1"
+shift
 if [[ ! "$run_id" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]]; then
   echo "RUN_ID may contain only letters, digits, underscore and hyphen" >&2
   exit 2
@@ -20,7 +21,7 @@ test -f configs/paths.local.json
 mkdir -p runs/_launch
 mkdir "$launch"
 nohup python -u -m pointcloud_lab.run_views \
-  --paths configs/paths.local.json --out "$out" \
+  --paths configs/paths.local.json --out "$out" "$@" \
   > "$launch/console.log" 2>&1 < /dev/null &
 pid="$!"
 printf '%s\n' "$pid" > "$launch/pid"

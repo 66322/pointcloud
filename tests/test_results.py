@@ -32,6 +32,13 @@ class ResultTests(unittest.TestCase):
         )
         self.assertEqual(command[command.index("--gpu") + 1], "1")
         self.assertEqual(command[command.index("--expected-frames") + 1], "6019")
+        self.assertEqual(command[command.index("--io-workers") + 1], "2")
+        old_options = evaluation_command(
+            Path("paths.json"), "mean_visible_cameras", Path("tokens.json"),
+            "0", Path("other_run"), 6019, 0, 0, False,
+        )
+        self.assertIn("--no-image-cache", old_options)
+        self.assertEqual(old_options[old_options.index("--io-workers") + 1], "0")
 
     def setup_batch(self, root):
         index = root / "info.pkl"

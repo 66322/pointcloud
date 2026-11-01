@@ -38,11 +38,47 @@ bash scripts/start_view_experiments.sh view_assignment_fullval_20261101_r03
 3. 沿用兼容权重、作者配置与TTA，由原作者SemSegTester计算最终指标。
 4. 自动汇总两项结果，与已验证的82.48%比较；不额外重跑默认模型。
 
+新入口默认启用有序原始帧读取、后台CPU预取及同帧DINO特征复用。
+这是后续需要新实验时的启动方式，不要求为提速再跑一遍已有两项实验。
+额外参数可直接传给nohup启动器，例如禁用优化时：
+
+~~~bash
+bash scripts/start_view_experiments.sh view_assignment_manual_options \
+  --io-workers 0 --prefetch-frames 0 --no-image-cache
+~~~
+
+启动器当前仍执行mean/first两项，它不是尚未实现的训练入口。
+参数只控制执行性能，不修改实验配置中的融合算法。
+
 只有单帧失败才停止并保留报错，不追加20/100帧关卡。后续同一入口已跑通可用
 --skip-smoke。每次使用新的输出名r02/r03，不覆盖已有结果。
 
 此批是无需训练的融合策略对照。策略可能提高或降低精度；完整结果用于决定
 下一步是否训练质量加权/局部对应/门控/模态dropout，而非预先认定方法有效。
+
+## 可选：只确认新执行路径的一帧
+
+当前r02继续运行。待GPU0空闲，若需要先确认提速入口，只执行下列一次单帧，
+直接与已有r02的同帧mean预测逐点比较，不另跑旧模型，不跑完整val测速。
+也可把这一步合并进下次真实实验的首次单帧检查。
+
+~~~bash
+cd /home/jovyan/zzx/pointcloud
+git pull --rebase
+conda activate pointcept-torch2.5.0-cu12.4
+python -m pointcloud_lab.evaluate \
+  --paths configs/paths.local.json \
+  --experiment configs/experiments/mean_visible_cameras.json \
+  --tokens runs/view_assignment_fullval_20261101_r02/smoke_tokens.json \
+  --expected-frames 1 --gpu 0 \
+  --out runs/execution_smoke_20261101_r01 \
+  --reference-predictions runs/view_assignment_fullval_20261101_r02/smoke_mean_one_frame/result
+~~~
+
+smoke_equivalence.json记录是否逐点相同；runtime.json记录缓存命中数。
+单帧不足以测量稳定吞吐，不据此报加速倍数。后续正式运行每20帧打印Pipeline：
+wall/frame包含I/O、预处理、TTA、网络、指标与写盘，data_wait/frame显示阻塞取数时间，
+ETA根据实际端到端速度计算。原作者Batch计时从数据送达后开始，不能直接估计剩余总时间。
 
 ## 保存位置
 

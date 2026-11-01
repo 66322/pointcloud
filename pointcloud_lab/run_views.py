@@ -14,14 +14,19 @@ LAB_ROOT = Path(__file__).resolve().parents[1]
 VARIANTS = (("mean_visible_cameras", "0"), ("first_visible_camera", "1"))
 
 
-def evaluation_command(paths_file, variant, tokens_file, gpu, out, count):
-    return [
+def evaluation_command(paths_file, variant, tokens_file, gpu, out, count,
+                       io_workers=2, prefetch_frames=1, image_cache=True):
+    command = [
         sys.executable, "-m", "pointcloud_lab.evaluate",
         "--paths", str(paths_file), "--experiment",
         str(LAB_ROOT / "configs" / "experiments" / f"{variant}.json"),
         "--tokens", str(tokens_file), "--expected-frames", str(count),
         "--gpu", gpu, "--out", str(out),
+        "--io-workers", str(io_workers), "--prefetch-frames", str(prefetch_frames),
     ]
+    if not image_cache:
+        command.append("--no-image-cache")
+    return command
 
 
 def main():
@@ -31,7 +36,16 @@ def main():
     parser.add_argument("--skip-smoke", action="store_true",
                         help="Use only when this exact runner has already passed one frame")
     parser.add_argument("--baseline-miou", type=float, default=82.48)
+    parser.add_argument("--io-workers", type=int, default=2)
+    parser.add_argument("--prefetch-frames", type=int, default=1)
+    parser.add_argument("--image-cache", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--reference-smoke",
+                        help="Optional old smoke result directory: compare the SAME single-frame prediction")
     args = parser.parse_args()
+    if args.io_workers < 0 or args.prefetch_frames < 0:
+        parser.error("I/O workers and prefetch frames must be nonnegative")
+    if args.skip_smoke and args.reference_smoke:
+        parser.error("--reference-smoke requires the single smoke frame")
     paths_file = Path(args.paths).resolve()
     paths = read_json(paths_file)
     infos = load_infos(paths["info"])
@@ -48,6 +62,8 @@ def main():
         "baseline_miou_pct": args.baseline_miou,
         "baseline_source": "existing user-validated full-val run; not rerun",
         "variants": [{"name": name, "physical_gpu": gpu} for name, gpu in VARIANTS],
+        "execution": {"raw_io_threads": args.io_workers,
+                      "prefetch_frames": args.prefetch_frames, "image_cache": args.image_cache},
     })
     processes, handles, rows = [], [], []
     try:
@@ -56,6 +72,7 @@ def main():
             command = evaluation_command(
                 paths_file, "mean_visible_cameras", output / "smoke_tokens.json",
                 "0", output / "smoke_mean_one_frame", 1,
+                args.io_workers, args.prefetch_frames, args.image_cache,
             )
             with (output / "smoke_console.log").open("w", encoding="utf-8") as stream:
                 result = subprocess.run(command, cwd=LAB_ROOT, stdout=stream,
@@ -64,11 +81,24 @@ def main():
                 log = output / "smoke_console.log"
                 tail = "\n".join(log.read_text(encoding="utf-8", errors="replace").splitlines()[-30:])
                 raise RuntimeError(f"One-frame run failed; see {log}\n\n{tail}")
+            if args.reference_smoke:
+                import numpy as np
+                token = tokens[0]
+                old = Path(args.reference_smoke) / f"{token}_pred.npy"
+                new = output / "smoke_mean_one_frame" / "result" / f"{token}_pred.npy"
+                same = np.array_equal(np.load(old, allow_pickle=False), np.load(new, allow_pickle=False))
+                write_json(output / "smoke_equivalence.json", {
+                    "token": token, "identical_point_predictions": same,
+                    "reference": str(old), "kind": "same single frame, no extra inference pass",
+                })
+                if not same:
+                    raise RuntimeError("Fast single-frame prediction differs from reference; inspect before full run")
         print(f"Starting full-val experiments directly: {len(tokens)} frames per method", flush=True)
         write_json(output / "status.json", {"status": "running", "stage": "full_validation"})
         for variant, gpu in VARIANTS:
             command = evaluation_command(
                 paths_file, variant, output / "tokens.json", gpu, output / variant, len(tokens),
+                args.io_workers, args.prefetch_frames, args.image_cache,
             )
             stream = (output / f"{variant}_console.log").open("w", encoding="utf-8")
             handles.append(stream)
