@@ -121,7 +121,7 @@ def main():
                     metrics = read_test_metrics(output / variant / "test.log")
                     row.update(
                         status="completed", miou_pct=metrics["miou_pct"],
-                        delta_miou_pp=metrics["miou_pct"] - args.baseline_miou,
+                        delta_miou_pp=round(metrics["miou_pct"] - args.baseline_miou, 4),
                         macc_pct=metrics["macc_pct"], oa_pct=metrics["oa_pct"],
                     )
                 rows.append(row)

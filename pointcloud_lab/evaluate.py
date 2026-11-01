@@ -22,6 +22,7 @@ def main():
     parser.add_argument("--image-cache", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--reference-predictions",
                         help="Optional existing result directory; same one-frame point prediction comparison")
+    parser.add_argument("--trained-run", help="Completed lab training directory; install its saved treatment")
     parser.add_argument("--allow-upstream-drift", action="store_true",
                         help="Compatibility option; upstream commit is now recorded, not gated")
     args = parser.parse_args()
@@ -30,6 +31,15 @@ def main():
     # Must happen before ANY import of torch, timm, or upstream pointcept.
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     paths, experiment, tokens = read_json(args.paths), read_json(args.experiment), read_json(args.tokens)
+    trained = None
+    if args.trained_run:
+        trained_root = Path(args.trained_run).resolve()
+        if read_json(trained_root / "status.json")["status"] != "completed":
+            raise ValueError("Training must finish before final evaluation")
+        trained = read_json(trained_root / "experiment.json")
+        paths = dict(paths, weight=str(trained_root / "model/model_last.pth"))
+        if experiment.get("assignment", "official") != "official":
+            raise ValueError("Trained-run evaluation installs its own saved assignment treatment")
     if args.expected_frames is not None and len(tokens) != args.expected_frames:
         raise ValueError("Token count differs from --expected-frames")
     if args.reference_predictions and len(tokens) != 1:
@@ -99,7 +109,15 @@ def main():
                 # Registered image weights are already in the compatible checkpoint.
                 import timm
                 with checkpoint_only_dino_init(timm):
-                    model = super().build_model()
+                    if trained is None:
+                        model = super().build_model()
+                    else:
+                        from pointcept.models import build_model
+                        from .training_models import install_treatment, load_full_state
+                        model = build_model(cfg.model)
+                        install_treatment(model, original, trained["method"], trained["protocol"])
+                        load_full_state(model, paths["weight"])
+                        model = model.cuda()
                 backbone = model.module.backbone if hasattr(model, "module") else model.backbone
                 backbone.img_enc.requires_grad_(False)
                 backbone.img_enc.eval()
@@ -138,10 +156,14 @@ def main():
         write_json(output / "provenance.json", {
             "created_at": timestamp(), "experiment": experiment, "paths": paths,
             "lab_git": git_state(Path(__file__).resolve().parents[1]), "upstream_git": upstream,
+            "source_snapshot": (
+                read_json(Path(__file__).resolve().parents[1] / "snapshot.json")
+                if (Path(__file__).resolve().parents[1] / "snapshot.json").is_file() else None),
             "weight_bytes": Path(paths["weight"]).stat().st_size,
             "tokens": tokens,
             "torch": torch.__version__, "physical_gpu_requested": args.gpu,
-            "kind": "evaluation_intervention_not_retrained_method",
+            "kind": "trained_checkpoint_full_validation" if trained else "evaluation_intervention_not_retrained_method",
+            "training_experiment": trained,
             "execution": {
                 "raw_io_threads": args.io_workers, "prefetch_frames": args.prefetch_frames,
                 "dataloader_processes": 0, "transform_order_and_rng": "original sequential",

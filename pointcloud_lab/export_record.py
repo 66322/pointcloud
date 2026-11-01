@@ -10,6 +10,7 @@ ALLOWED = (
     "report.md", "provenance.json", "model_audit.json", "runtime.json", "tokens.json",
     "comparison.csv",
     "smoke_equivalence.json",
+    "protocol.json", "experiment.json", "first_step.json", "config.py", "trajectory.jsonl",
 )
 
 
@@ -45,7 +46,8 @@ def export(source, target):
         encoding="utf-8",
     )
     # A batch bundles the two actual experiment results with one export command.
-    for name in ("mean_visible_cameras", "first_visible_camera"):
+    for name in ("mean_visible_cameras", "first_visible_camera",
+                 "control", "gate", "mean", "camera_dropout", "train", "val"):
         child = source / name
         if (child / "status.json").is_file():
             export(child, target / name)

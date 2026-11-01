@@ -34,8 +34,11 @@ Accuracy括号内是逐类平均准确率mAcc，不是整体点准确率OA。
   不能据此宣称稳定提升、统计显著或已成立论文贡献。
 - 不追加重复完整val、多级小样本关卡或额外SHA检查。读取已有report/status、
   逐类summary并导出轻量记录即可；继续准备同预算训练对照、门控与独立dropout路线。
-- 尚未接收到最终Val result行、OA、status.json、report.md或轻量导出。
-  此文件只记录已见末帧证据，不代替真实运行目录的完整导出，也不声称最终清理/退出已确认。
+- 补充回执已收到status.json及report.md，状态completed，结束时间
+  2026-11-01T11:38:55.907847+00:00，即北京时间19:38:55。
+  report.md确认first82.55%、mean82.64%，差值显示0.06999999999999318和
+  0.1599999999999966是浮点显示尾数，不是额外精度；后续报告已改为四位小数舍入。
+  OA、逐类summary及完整轻量导出仍未收到，不声称全部服务器产物已上传。
 - 不从Batch平均0.810/0.803推算端到端总耗时，该计时排除了loader等待。
 
 指标定义依据：[原SemSegTester](https://github.com/RWTHVision/ditr/blob/f66d1dadb82e97ded7750567a043e4783305b01c/pointcept/engines/test.py#L274)。
