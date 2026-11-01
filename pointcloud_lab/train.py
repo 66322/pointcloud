@@ -139,8 +139,15 @@ def main():
             "total_attempted_steps": total_attempts, "amp": bool(cfg.enable_amp),
             "trainable_parameter_elements": sum(p.numel() for p in model.parameters() if p.requires_grad),
             "gate_parameter_elements": sum(p.numel() for name, p in model.named_parameters() if "lab_gate" in name),
+            "local_parameter_elements": sum(p.numel() for name, p in model.named_parameters() if "lab_local" in name),
             "dino_trainable_elements": sum(p.numel() for p in model.backbone.img_enc.parameters() if p.requires_grad),
-            "checkpoint_loading": "strict; pretrained state first, then identity gate installation",
+            "checkpoint_loading": "strict; pretrained state first, then declared treatment; resume restores treatment",
+            "local_attention_definition": ({
+                "query": "raw xyz+strength, four inputs", "visual_channels": 1024,
+                "hidden": protocol["gate_hidden"], "window": "3x3 nearest-token neighborhood",
+                "temperature": 0.2, "residual": "tanh(alpha), alpha initialized zero",
+                "point_chunk": 2048, "training_value_memory": "non-reentrant activation checkpointing",
+            } if args.method == "local_attention" else None),
             "loader_transport": "numpy pipe; main-process pinning; no shared tensor storage",
             "augmentation_seed": "sample_seed(seed, epoch, row); model CPU/CUDA RNG isolated",
             "evaluation": "final checkpoint only, original full validation TTA, separate process",
@@ -203,7 +210,9 @@ def main():
                             p.grad is not None for name, p in model.named_parameters() if "lab_gate" in name
                         ):
                             raise RuntimeError("Gate is not connected to loss")
-                        if args.method == "camera_dropout" and not policy.calls:
+                        if args.method == "local_attention" and model.backbone.lab_local.alpha.grad is None:
+                            raise RuntimeError("Local attention is not connected to loss")
+                        if args.method in {"camera_dropout", "whole_camera_dropout"} and not policy.calls:
                             raise RuntimeError("Camera dropout policy was not called")
                     else:
                         finite = True

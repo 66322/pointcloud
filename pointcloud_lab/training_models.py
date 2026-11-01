@@ -5,6 +5,9 @@ import torch
 from torch import nn
 
 from .interventions import assign_variant
+from .sampling import LocalTokenAttention, assign_sampled, local_average, point_validity
+from .training_protocol import METHODS
+from .validity import validity_pool_forward, validity_unpool_forward
 
 
 class FusionGate(nn.Module):
@@ -51,11 +54,19 @@ class AssignmentPolicy:
         self.calls = self.dropped = 0
 
     def __call__(self, data, features, patch, missing=None):
+        if self.method.startswith("valid_"):
+            data["lab_image_valid"] = point_validity(data, features, patch).any(-1)
+        if self.method in {"center_select", "center_weighted", "bilinear", "local_attention"}:
+            return assign_sampled(data, features, patch, missing, mode=self.method,
+                                  local=getattr(self.backbone, "lab_local", None))
+        if self.method == "local_average":
+            return self.original(data, local_average(features), patch, missing)
         if self.method == "mean":
             return assign_variant(data, features, patch, missing, mode="mean")
-        if self.method != "camera_dropout" or not self.backbone.training:
+        if self.method not in {"camera_dropout", "whole_camera_dropout"} or not self.backbone.training:
             return self.original(data, features, patch, missing)
-        keep = torch.rand(features.shape[:2], generator=self.generator) >= self.probability
+        shape = (features.shape[0], 1) if self.method == "whole_camera_dropout" else features.shape[:2]
+        keep = (torch.rand(shape, generator=self.generator) >= self.probability).expand(features.shape[:2])
         self.calls += 1
         self.dropped += int((~keep).sum())
         offsets = data.get("unmix3d_offset", data["offset"]).long()
@@ -70,10 +81,29 @@ class AssignmentPolicy:
 
 
 def install_treatment(model, image_module, method, protocol):
-    if method not in ("control", "mean", "gate", "camera_dropout"):
+    if method not in METHODS:
         raise ValueError("Unsupported training treatment")
     backbone = model.backbone
     freeze_dino(backbone)
+    if method == "local_attention":
+        with torch.random.fork_rng(devices=[]):
+            torch.set_rng_state(torch.Generator().manual_seed(protocol["seed"] + 41).get_state())
+            backbone.add_module("lab_local", LocalTokenAttention(
+                backbone.img_enc.output_channels, protocol["gate_hidden"]))
+    if method in {"valid_mask", "valid_pool", "valid_both"}:
+        pools = unpools = 0
+        for module in list(backbone.modules()):
+            if isinstance(module, image_module.SerializedPooling):
+                module.lab_original_forward = module.forward
+                module.lab_mask_pool = method in {"valid_pool", "valid_both"}
+                module.forward = MethodType(validity_pool_forward, module)
+                pools += 1
+            elif isinstance(module, image_module.SerializedUnpooling):
+                if method in {"valid_mask", "valid_both"}:
+                    module.forward = MethodType(validity_unpool_forward, module)
+                unpools += 1
+        if (pools, unpools) != (4, 4):
+            raise ValueError(f"Expected four pooling/unpooling stages, found {pools}/{unpools}")
     if method == "gate":
         # Initialize new CPU modules without changing the pretrained model's RNG stream.
         with torch.random.fork_rng(devices=[]):

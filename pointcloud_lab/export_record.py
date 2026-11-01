@@ -4,6 +4,7 @@ import shutil
 from pathlib import Path
 
 from .common import read_json, write_json
+from .training_protocol import METHODS
 
 ALLOWED = (
     "status.json", "preflight.json", "summary.json", "confusions.json", "per_class.csv",
@@ -11,6 +12,7 @@ ALLOWED = (
     "comparison.csv",
     "smoke_equivalence.json",
     "protocol.json", "experiment.json", "first_step.json", "config.py", "trajectory.jsonl",
+    "plan.json", "screen_protocol.json", "medium_protocol.json", "queue.json", "reuse.json",
 )
 
 
@@ -19,8 +21,12 @@ def export(source, target):
     if not source.is_dir():
         raise ValueError("Missing run directory")
     status = read_json(source / "status.json")
-    if status["status"] == "running":
+    if status["status"] in {"running", "waiting_for_prior"}:
         raise ValueError("Cannot freeze evidence while a run is active")
+    queue = source / "queue.json"
+    if queue.is_file() and any(job["status"] in {"pending", "running"}
+                               for job in read_json(queue)["jobs"]):
+        raise ValueError("Cannot freeze a queue with unfinished jobs")
     files = [source / name for name in ALLOWED if (source / name).is_file()]
     if any(x.stat().st_size > 5_000_000 for x in files) or sum(x.stat().st_size for x in files) > 10_000_000:
         raise ValueError("Evidence bundle too large; review before publication")
@@ -46,11 +52,15 @@ def export(source, target):
         encoding="utf-8",
     )
     # A batch bundles the two actual experiment results with one export command.
-    for name in ("mean_visible_cameras", "first_visible_camera",
-                 "control", "gate", "mean", "camera_dropout", "train", "val"):
+    for name in ("mean_visible_cameras", "first_visible_camera", *METHODS, "train", "val"):
         child = source / name
         if (child / "status.json").is_file():
             export(child, target / name)
+    jobs = source / "jobs"
+    if jobs.is_dir():
+        for child in sorted(jobs.iterdir()):
+            if child.is_dir() and not child.is_symlink() and (child / "status.json").is_file():
+                export(child, target / "jobs" / child.name)
 
 
 def main():

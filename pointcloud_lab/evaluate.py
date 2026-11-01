@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from .common import fresh_dir, git_state, read_json, select_infos, timestamp, write_json
+from .eval_conditions import condition_description
 
 
 def main():
@@ -23,6 +24,8 @@ def main():
     parser.add_argument("--reference-predictions",
                         help="Optional existing result directory; same one-frame point prediction comparison")
     parser.add_argument("--trained-run", help="Completed lab training directory; install its saved treatment")
+    parser.add_argument("--camera-count", type=int, choices=(0, 1, 3, 6), default=6)
+    parser.add_argument("--pixel-shift-x", type=float, default=0.0)
     parser.add_argument("--allow-upstream-drift", action="store_true",
                         help="Compatibility option; upstream commit is now recorded, not gated")
     args = parser.parse_args()
@@ -119,6 +122,10 @@ def main():
                         load_full_state(model, paths["weight"])
                         model = model.cuda()
                 backbone = model.module.backbone if hasattr(model, "module") else model.backbone
+                if args.camera_count != 6 or args.pixel_shift_x:
+                    from .eval_conditions import EvaluationAssignment
+                    original.assign_image_feat = EvaluationAssignment(
+                        original.assign_image_feat, args.camera_count, args.pixel_shift_x)
                 backbone.img_enc.requires_grad_(False)
                 backbone.img_enc.eval()
                 params = list(backbone.img_enc.parameters())
@@ -164,6 +171,7 @@ def main():
             "torch": torch.__version__, "physical_gpu_requested": args.gpu,
             "kind": "trained_checkpoint_full_validation" if trained else "evaluation_intervention_not_retrained_method",
             "training_experiment": trained,
+            "evaluation_condition": condition_description(args.camera_count, args.pixel_shift_x),
             "execution": {
                 "raw_io_threads": args.io_workers, "prefetch_frames": args.prefetch_frames,
                 "dataloader_processes": 0, "transform_order_and_rng": "original sequential",

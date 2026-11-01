@@ -1,6 +1,9 @@
 """Small explicit paired fine-tuning protocol; contains no Torch import."""
 
-METHODS = ("control", "gate", "mean", "camera_dropout")
+METHODS = ("control", "gate", "mean", "camera_dropout",
+           "center_select", "center_weighted", "bilinear", "local_average",
+           "local_attention", "valid_mask", "valid_pool", "valid_both",
+           "whole_camera_dropout")
 
 
 def validate_protocol(protocol):

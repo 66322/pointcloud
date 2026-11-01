@@ -48,8 +48,10 @@ report.md确认上述两项mIoU与差值；OA/逐类summary尚未收到，完整
 ## 多路线保留
 
 完整实施状态与下一批任务见[EXPERIMENT_MATRIX](EXPERIMENT_MATRIX.md)。
-当前自动队列只含四组微调，A质量选择/有效池化、B局部匹配、C可信度与互补价值、
-D配对鲁棒评价和蒸馏尚未全部实现；不能把本轮四组当成完整规划已经落实。
+旧r02只含四组微调。新增[无人值守接续队列](CAMPAIGN_RUNBOOK.md)已实现，
+服务器待一次启动：新增9组两轮短训、6组十轮训练、27次完整评价；
+复用旧四组正常完成的8个训练/评价节点。质量代理选视图、局部取样、有效性池化、
+整组相机dropout和配对压力评价已接入；显式r/u、蒸馏等仍未实现。
 
 | 路线 | 具体改法 | 最小实验 | 优先条件 |
 |---|---|---|---|
@@ -119,3 +121,22 @@ dropout首轮clean结果不证明相机缺失鲁棒性，后续针对候选再�
 - 初试用于找有效方向，最终论文阶段再做必要消融、多种子和泛化验证。
 - 需要训练的新模块先确认一次前向/反向正常，再训练，不对未改动部分重复验证。
 - 如实记录失败，不编造指标，不用旧预测冒充新方法。
+
+## 无人值守多路线任务（代码交付，服务器待启动）
+
+见configs/training/multi_route_queue.json、pointcloud_lab/campaign.py。
+新任务沿用已准备好的原数据与权重，不添加全量扫描/哈希或小样本多级验证。
+等待旧r02终态后复用可用同预算结果；只调度GPU0/1，任何外部GPU进程存在时不抢占。
+每个方法首次真实更新通过后直接继续；独立失败不终止其他路线。
+
+- 两轮新增：center_select、center_weighted、bilinear、local_average、
+  local_attention、valid_mask、valid_pool、valid_both、whole_camera_dropout。
+- 十轮预先固定：control、gate、center_select、local_attention、valid_both、whole_camera_dropout；
+  重新从原权重按十轮调度训练，不用两轮分数作为取消条件。
+- 正常完整val共15次；短训control/camera_dropout/whole_camera_dropout的3/1/0相机
+  评价共9次；短训control/bilinear/local_attention的横向4像素错位评价共3次。
+- 两轮、十轮、缺相机和偏移分别使用对应control；对照不混用。
+- 结果集中runs/multi_route_20261101_r01，完成后统一导出到records/experiments同名目录。
+
+中心质量只是几何代理，local query当前是原始xyz/strength而非编码后语义，
+固定相机子集不是所有组合，4px不是SE(3)。本批CPU检查不冒称H100实跑或方法有效。

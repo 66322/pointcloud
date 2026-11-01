@@ -4,8 +4,18 @@ GitHub main是两台电脑和服务器的共同版本。用户手动执行服务
 
 **当前直接做实验：** [运行命令](docs/RUNBOOK.md) · [实验总表](docs/EXPERIMENT_MASTER.md)
 
-[完整路线与实施状态](docs/EXPERIMENT_MATRIX.md)：当前四组是首轮筛选，
-局部匹配、质量选择/有效池化、显式可信度/互补价值和蒸馏等尚未全部实现或排队。
+[完整路线与实施状态](docs/EXPERIMENT_MATRIX.md) · **[无人值守接续队列](docs/CAMPAIGN_RUNBOOK.md)**：
+旧四组继续；新入口已实现9组短训、6组十轮训练及配对压力评价。
+现在启动一次后自动等待旧批次、复用完成项、两卡接续，方法失败不停止其他独立任务。
+新入口服务器待用户启动；显式r/u分支、选择性蒸馏等仍未实现。
+
+~~~bash
+cd /home/jovyan/zzx/pointcloud
+git pull --ff-only
+conda activate pointcept-torch2.5.0-cu12.4
+bash scripts/start_campaign.sh multi_route_20261101_r01 \
+  --after runs/finetune_stage1_20261101_r02
+~~~
 
 已有nuScenes 16类、PTv3+DINOv2-L完整val基线为82.48% mIoU。
 代码/数据/权重已准备好；新入口只确认一次单帧可运行，就直接进行实验。
