@@ -13,7 +13,7 @@ GitHub main是两台电脑和服务器的共同版本。用户手动执行服务
 
 ~~~bash
 python -m pointcloud_lab.run_views --paths configs/paths.local.json \
-  --out runs/view_assignment_fullval_20261101_r01
+  --out runs/view_assignment_fullval_20261101_r02
 ~~~
 
 | 目录 | 用途 |

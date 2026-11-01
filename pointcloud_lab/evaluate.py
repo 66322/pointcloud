@@ -39,6 +39,7 @@ def main():
     try:
         os.environ.setdefault("HF_HOME", paths["hf_cache"])
         os.environ.setdefault("HF_HUB_OFFLINE", "1")
+        os.environ.setdefault("NO_ALBUMENTATIONS_UPDATE", "1")
         sys.path.insert(0, paths["ditr_root"])
         # Preserve all relative paths expected by author's saved configuration.
         os.chdir(paths["ditr_root"])
@@ -47,6 +48,7 @@ def main():
         from pointcept.engines.test import SemSegTester
         from pointcept.datasets import build_dataset
         from .interventions import assign_variant
+        from .model_init import checkpoint_only_dino_init
 
         cfg = default_config_parser(paths["config"], {
             "save_path": output.as_posix(), "weight": paths["weight"],
@@ -74,13 +76,17 @@ def main():
         class LabTester(SemSegTester):
             def build_model(self):
                 # Upstream loads checkpoint with strict=True. No conversion or skipped keys here.
-                model = super().build_model()
+                # Registered image weights are already in the compatible checkpoint.
+                import timm
+                with checkpoint_only_dino_init(timm):
+                    model = super().build_model()
                 backbone = model.module.backbone if hasattr(model, "module") else model.backbone
                 backbone.img_enc.requires_grad_(False)
                 backbone.img_enc.eval()
                 params = list(backbone.img_enc.parameters())
                 audit.update({
                     "load_state_dict_strict": True,
+                    "dino_initialization": "architecture_only_then_full_strict_checkpoint",
                     "model_state_dict_entries": len(model.state_dict()),
                     "dino_parameter_elements": sum(x.numel() for x in params),
                     "dino_trainable_elements": sum(x.numel() for x in params if x.requires_grad),

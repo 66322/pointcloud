@@ -61,7 +61,9 @@ def main():
                 result = subprocess.run(command, cwd=LAB_ROOT, stdout=stream,
                                         stderr=subprocess.STDOUT)
             if result.returncode:
-                raise RuntimeError(f"One-frame run failed; see {output / 'smoke_console.log'}")
+                log = output / "smoke_console.log"
+                tail = "\n".join(log.read_text(encoding="utf-8", errors="replace").splitlines()[-30:])
+                raise RuntimeError(f"One-frame run failed; see {log}\n\n{tail}")
         print(f"Starting full-val experiments directly: {len(tokens)} frames per method", flush=True)
         write_json(output / "status.json", {"status": "running", "stage": "full_validation"})
         for variant, gpu in VARIANTS:

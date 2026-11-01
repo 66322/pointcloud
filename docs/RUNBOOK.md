@@ -12,7 +12,7 @@ cd /home/jovyan/zzx/pointcloud
 git pull --rebase
 conda activate pointcept-torch2.5.0-cu12.4
 python -m pointcloud_lab.run_views --paths configs/paths.local.json \
-  --out runs/view_assignment_fullval_20261101_r01
+  --out runs/view_assignment_fullval_20261101_r02
 ~~~
 
 脚本自动完成：
@@ -32,7 +32,7 @@ python -m pointcloud_lab.run_views --paths configs/paths.local.json \
 
 所有新实验集中在：
 
-/home/jovyan/zzx/pointcloud/runs/view_assignment_fullval_20261101_r01/
+/home/jovyan/zzx/pointcloud/runs/view_assignment_fullval_20261101_r02/
 
 - smoke_console.log：唯一一次单帧检查的终端输出。
 - mean_visible_cameras/：GPU0完整实验，包括test.log、summary.json、预测。
@@ -48,20 +48,20 @@ python -m pointcloud_lab.run_views --paths configs/paths.local.json \
 
 ~~~bash
 cd /home/jovyan/zzx/pointcloud
-tail -n 10 runs/view_assignment_fullval_20261101_r01/mean_visible_cameras_console.log
-tail -n 10 runs/view_assignment_fullval_20261101_r01/first_visible_camera_console.log
+tail -n 10 runs/view_assignment_fullval_20261101_r02/mean_visible_cameras_console.log
+tail -n 10 runs/view_assignment_fullval_20261101_r02/first_visible_camera_console.log
 ~~~
 
-如单帧失败，只查看smoke_console.log，不重装环境或重复下载数据。
+r01因timm额外读取DINO预训练缓存失败，已修复。现在构建结构后直接严格加载完整兼容权重，无需下载或迁移缓存。若再次失败，入口会直接显示日志最后30行。
 
 ## 结束后同步结果
 
 ~~~bash
 python -m pointcloud_lab.export_record \
-  --run runs/view_assignment_fullval_20261101_r01 \
-  --record records/experiments/view_assignment_fullval_20261101_r01
+  --run runs/view_assignment_fullval_20261101_r02 \
+  --record records/experiments/view_assignment_fullval_20261101_r02
 
-git add records/experiments/view_assignment_fullval_20261101_r01
+git add records/experiments/view_assignment_fullval_20261101_r02
 git commit -m "Record full-val view assignment experiments"
 git pull --rebase
 git -c credential.helper= push origin main
