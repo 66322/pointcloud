@@ -15,7 +15,7 @@ git clone https://github.com/66322/pointcloud.git pointcloud
 cd /home/jovyan/zzx/pointcloud
 git pull --ff-only
 conda activate pointcept-torch2.5.0-cu12.4
-cp -n configs/paths.server.example.json configs/paths.local.json
+test -f configs/paths.local.json || cp configs/paths.server.example.json configs/paths.local.json
 CUDA_VISIBLE_DEVICES=0,1 python -m unittest discover -s tests -v
 bash scripts/run_stage1.sh preflight env_baseline_audit_20261101
 ~~~
@@ -77,6 +77,8 @@ git push origin main
 ~~~
 
 另一台电脑仅需 git pull --ff-only 查看相同记录。
+若服务器已commit但push遇到HTTPS 403，见[同步排障](GITHUB_SYNC.md)。
+无需重跑或重复导出记录；远端新增了文档时先git pull --rebase，再推送本地实验提交。
 不要 git add .；不要用 force push。若拉取遇到本地修改，先提交自己明确要同步
 的记录再拉取，不使用 reset --hard 清理。
 

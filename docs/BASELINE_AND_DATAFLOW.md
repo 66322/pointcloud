@@ -77,5 +77,7 @@ eval_subset.py 输出路径确认缓存为最终原始点顺序，再传
 3. server_verified：有服务器 manifest、日志、哈希和完整输出。
 4. supported_method：公平训练、消融、多种子/泛化证据支持。
 
-目前基线历史成绩属于 reported，新工具属于 local_tested；
-尚无新增 server_verified 改进结果。
+2026-11-01补充：用户终端回传支持服务器9项测试通过、preflight核对旧日志和
+6019个预测、100帧旧缓存诊断完成。完整JSON/CSV因push 403暂未上传，
+证据来源明确记为“服务器终端回传”，不冒充已从GitHub读取全部产物。
+strict加载及DINO冻结审计仍待模型smoke；尚无新增改进方法结果。
