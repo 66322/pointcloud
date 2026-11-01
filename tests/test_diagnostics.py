@@ -33,6 +33,11 @@ class MetricTests(unittest.TestCase):
             confusion(np.array([0.0]), np.array([0]))
         self.assertEqual(LEARNING_MAP[9], 0)
         self.assertEqual(LEARNING_MAP[30], 15)
+        # Emergency police (raw 20) is ignored by DITR, never motorcycle (raw 21).
+        self.assertEqual(LEARNING_MAP[20], -1)
+        self.assertEqual(LEARNING_MAP[21], 5)
+        cm = confusion(np.array([5, 5]), LEARNING_MAP[np.array([20, 21])])
+        self.assertEqual(cm.sum(), 1)
 
     def test_scene_bootstrap_not_point_bootstrap(self):
         self.assertIsNone(bootstrap_scene_miou([np.eye(16)], 20))
@@ -100,13 +105,10 @@ class IntegrationTests(unittest.TestCase):
             diagnose(paths, second, 1, alignment_confirmed=True)
             compared = compare(output, second, root / "comparison")
             self.assertLess(read_json(compared / "summary.json")["groups"][0]["delta_miou_pp"], 0)
-            # Identical lengths with different raw point order must fail paired comparison.
-            raw_path = root / "data/raw/points.bin"
-            points = np.fromfile(raw_path, np.float32).reshape(-1, 5)
-            points[[0, 1]] = points[[1, 0]]
-            points.tofile(raw_path)
+            # Different label supports cannot be treated as a paired experiment.
+            np.array([14, 14, 0], np.uint8).tofile(root / "data/raw/labels.bin")
             diagnose(paths, root / "changed_input", 1, alignment_confirmed=True)
-            with self.assertRaisesRegex(ValueError, "input_array_set_sha256"):
+            with self.assertRaisesRegex(ValueError, "support changed"):
                 compare(output, root / "changed_input", root / "should_not_exist")
 
     def test_alignment_rejected_before_results(self):

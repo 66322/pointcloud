@@ -8,8 +8,9 @@ CLASS_NAMES = (
 # nuScenes raw 32-class IDs -> the pinned DITR 16-class train IDs.
 LEARNING_MAP = np.array([
     -1, -1, 6, 6, 6, -1, 6, -1, -1, 0, -1, -1, 7, -1, 1, 2,
-    2, 3, 4, -1, 5, 5, 8, 9, 10, 11, 12, 13, 14, -1, 15, -1,
+    2, 3, 4, -1, -1, 5, 8, 9, 10, 11, 12, 13, 14, -1, 15, -1,
 ], dtype=np.int64)
+LABEL_MAPPING_VERSION = "nuscenes16_raw20ignored_v2"
 
 
 def confusion(pred, target, classes=16):

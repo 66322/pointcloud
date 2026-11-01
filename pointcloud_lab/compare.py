@@ -1,4 +1,4 @@
-"""Compare paired diagnostics after verifying identical tokens and input fingerprints."""
+"""Compare paired diagnostics using tokens, mapping version and label counts."""
 import argparse
 import csv
 from pathlib import Path
@@ -11,8 +11,9 @@ def compare(reference, candidate, out):
         if read_json(folder / "status.json")["status"] != "completed":
             raise ValueError("Comparison needs two completed diagnostics")
     ref_meta, can_meta = [read_json(x / "provenance.json") for x in (reference, candidate)]
-    for field in ("info_sha256", "input_array_set_sha256", "selected_tokens"):
-        if ref_meta[field] != can_meta[field]:
+    for field in ("label_mapping_version", "selected_tokens"):
+        if ref_meta.get(field, "legacy_mapping_raw20motorcycle") != can_meta.get(
+                field, "legacy_mapping_raw20motorcycle"):
             raise ValueError(f"Paired comparison mismatch: {field}")
     ref, can = [read_json(x / "summary.json") for x in (reference, candidate)]
     if ref["groups"].keys() != can["groups"].keys():
@@ -38,7 +39,7 @@ def compare(reference, candidate, out):
         "note": "No trained-method/novelty claim; inspect per-class support and full validation.",
     })
     lines = ["# Paired diagnostic comparison", "",
-             f"Frames: {ref['frames']}. Identical token/input fingerprints checked.", "",
+             f"Frames: {ref['frames']}. Same tokens, mapping version and label support.", "",
              "| Group | Reference mIoU % | Candidate mIoU % | Delta pp |",
              "|---|---:|---:|---:|"]
     lines += [f"| {r['group']} | {r['reference_miou_fixed16_pct']:.4f} | "

@@ -1,35 +1,31 @@
-# Pointcloud — DITR 改进实验
+# Pointcloud — DITR改进实验
 
-以 GitHub main 为两台开发电脑和服务器的共同版本，用户在服务器手动执行命令。
+GitHub main是两台电脑和服务器的共同版本。用户手动执行服务器命令。
 
-**实验目的、进度、路线与结论统一入口：**
-[实验总表](docs/EXPERIMENT_MASTER.md)
+**当前直接做实验：** [运行命令](docs/RUNBOOK.md) · [实验总表](docs/EXPERIMENT_MASTER.md)
 
-**本轮先执行：**
-[服务器运行手册](docs/RUNBOOK.md)中的“第一次执行：只做环境核对与 100 帧离线诊断”。
+已有nuScenes 16类、PTv3+DINOv2-L完整val基线为82.48% mIoU。
+代码/数据/权重已准备好；新入口只确认一次单帧可运行，就直接进行实验。
+不重复默认基线，不设20/100帧关卡，不例行做文件/权重哈希检查。
 
-当前状态：已整理 nuScenes 16 类、PTv3 + DINOv2-L 的既有复现记录：
-完整 val 6019 帧，mIoU **82.48%**。来源为用户提供的复现说明；
-服务器终端回传已核对原始日志与6019个缓存，检查点strict加载及DINO冻结仍待smoke。
-作者 83.1% 仅列参考，差距 -0.62 个百分点尚未解释。
+当前两项正式对照：GPU0有效多视图均值、GPU1首有效视图，完整val，自动汇总。
+代码已准备，暂无这两项的真实改进分数。
 
-最新回传：服务器9项测试通过，100帧旧缓存诊断完成；
-完整记录的推送遇到403，处理方式见[同步排障](docs/GITHUB_SYNC.md)。
-诊断审阅见[第一批结果分析](records/analyses/pilot100_review_20261101.md)。
+~~~bash
+python -m pointcloud_lab.run_views --paths configs/paths.local.json \
+  --out runs/view_assignment_fullval_20261101_r01
+~~~
 
 | 目录 | 用途 |
 |---|---|
-| docs/ | 总计划、运行手册、基线事实与数据流 |
-| configs/ | 实验定义；机器路径另放被忽略的 paths.local.json |
-| pointcloud_lab/ | 独立诊断、运行适配器、统计及记录导出 |
-| scripts/ | 固定流程入口 |
-| tests/ | CPU 统计与数据对齐测试；服务器补充 torch 测试 |
-| runs/ | 服务器完整运行输出，不进 Git |
-| records/experiments/ | 审核后的轻量实验依据，进入 Git |
+| docs/ | 实验总表、命令与基线说明 |
+| configs/ | 实验定义，本机路径放ignored的paths.local.json |
+| pointcloud_lab/ | 实验代码与结果汇总 |
+| runs/ | 完整服务器输出，不进Git |
+| records/experiments/ | 轻量实测结果，进入Git |
+| tests/ | 开发时验证代码；不要求服务器每次重跑 |
 
-第一批：旧预测分组诊断 → 单帧默认推理 → 同 100 帧默认/首视图/均值干预。
-当前没有新增训练结果，也没有已证实的改进分数。
-
-所有新输出使用唯一 run_id；重复目录直接报错。数据、权重与旧预测不搬动。
-研究依据来自 [DITR](https://github.com/RWTHVision/ditr)，固定上游
-f66d1dadb82e97ded7750567a043e4783305b01c。
+旧离线诊断的原始标签20映射曾出错，已修正；旧81.7190%不作为新基线。
+详见[更正说明](records/analyses/diagnostic_mapping_correction_20261101.md)。
+原始DITR、数据、权重、已有预测保持原位置，新实验输出独立保存。
+基于[DITR](https://github.com/RWTHVision/ditr)。

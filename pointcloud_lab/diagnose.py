@@ -1,7 +1,6 @@
 """Read existing final predictions in ORIGINAL LiDAR point order; no model/GPU."""
 import argparse
 import csv
-import hashlib
 import platform
 import socket
 from collections import defaultdict
@@ -12,10 +11,12 @@ from PIL import Image
 
 from .common import (
     fresh_dir, git_state, load_infos, read_json, resolve_raw, select_infos,
-    sha256, timestamp, write_json,
+    timestamp, write_json,
 )
 from .geometry import group_masks, project
-from .metrics import CLASS_NAMES, LEARNING_MAP, bootstrap_scene_miou, confusion, scores
+from .metrics import (
+    CLASS_NAMES, LEARNING_MAP, LABEL_MAPPING_VERSION, bootstrap_scene_miou, confusion, scores,
+)
 
 
 def diagnose(paths, out, limit=100, seed=20261101, tokens=None, scene_map=None,
@@ -27,8 +28,6 @@ def diagnose(paths, out, limit=100, seed=20261101, tokens=None, scene_map=None,
     write_json(output / "status.json", {"status": "running", "started_at": timestamp()})
     matrices, scene_matrices = {}, defaultdict(lambda: np.zeros((16, 16), dtype=np.int64))
     manifest, point_counts, relationship_counts = [], defaultdict(int), defaultdict(int)
-    source_digest = hashlib.sha256()
-    input_digest = hashlib.sha256()
     try:
         for frame_index, info in enumerate(selected):
             token = str(info["lidar_token"])
@@ -70,21 +69,11 @@ def diagnose(paths, out, limit=100, seed=20261101, tokens=None, scene_map=None,
                 if token not in scene_map:
                     raise ValueError(f"{token}: missing scene mapping")
                 scene_matrices[str(scene_map[token])] += frame_cm
-            # Fingerprints for predictions + labels + LiDAR order in this run.
-            digest = hashlib.sha256()
-            frame_input_digest = hashlib.sha256()
-            for array in (points, raw_gt):
-                frame_input_digest.update(np.ascontiguousarray(array).tobytes())
-            input_digest.update(f"{token}:{frame_input_digest.hexdigest()}\n".encode())
-            for array in (points, raw_gt, pred):
-                digest.update(np.ascontiguousarray(array).tobytes())
-            source_digest.update(f"{token}:{digest.hexdigest()}\n".encode())
             manifest.append({
                 "token": token, "points": len(points),
                 "labelled_points": int((target != -1).sum()),
                 "covered_distinct_points": int(visible.any(1).sum()),
                 "point_camera_relationships": int(visible.sum()),
-                "sha256_lidar_labels_prediction_arrays": digest.hexdigest(),
             })
             if (frame_index + 1) % 20 == 0:
                 print(f"diagnosed {frame_index + 1}/{len(selected)}", flush=True)
@@ -108,7 +97,7 @@ def diagnose(paths, out, limit=100, seed=20261101, tokens=None, scene_map=None,
             "top_confusion_pairs_by_point_count": pairs,
             "ci_note": "scene bootstrap" if ci else "not estimated; need >=2 scenes and scene map",
             "visibility_definition": "geometric frustum coverage, NOT occlusion-verified visibility",
-            "alignment_evidence": "operator attestation + token/count/range checks + array fingerprints; "
+            "alignment_evidence": "existing verified cache + token/count/range checks; "
                                   "shape alone does NOT prove semantic order",
         })
         with (output / "per_class.csv").open("w", newline="", encoding="utf-8") as stream:
@@ -122,9 +111,8 @@ def diagnose(paths, out, limit=100, seed=20261101, tokens=None, scene_map=None,
         write_json(output / "tokens.json", [x["lidar_token"] for x in selected])
         write_json(output / "confusions.json", {k: x.tolist() for k, x in matrices.items()})
         write_json(output / "provenance.json", {
-            "created_at": timestamp(), "seed": seed, "info_sha256": sha256(paths["info"]),
-            "prediction_array_set_sha256": source_digest.hexdigest(),
-            "input_array_set_sha256": input_digest.hexdigest(),
+            "created_at": timestamp(), "seed": seed,
+            "label_mapping_version": LABEL_MAPPING_VERSION,
             "lab_git": git_state(Path(__file__).resolve().parents[1]),
             "upstream_git": git_state(paths["ditr_root"]),
             "python": platform.python_version(), "host": socket.gethostname(),
@@ -136,7 +124,7 @@ def diagnose(paths, out, limit=100, seed=20261101, tokens=None, scene_map=None,
             f"Frames: {len(selected)}; labelled points: {overall['labelled_points']}.",
             f"Fixed-16 mIoU: {overall['miou_fixed16_pct']:.4f}%; "
             f"present-union classes: {overall['present_union_classes']}/16.",
-            "A pilot is not a full validation result. No improved-model claim.", "",
+            "Existing-cache analysis; this is not a new-model improvement.", "",
             "| Group | Points (incl ignored) | Labelled | mIoU fixed16 % | OA % |",
             "|---|---:|---:|---:|---:|",
         ]

@@ -6,7 +6,7 @@ import platform
 import subprocess
 from pathlib import Path
 
-from .common import fresh_dir, git_state, read_json, sha256, timestamp, write_json
+from .common import fresh_dir, git_state, read_json, timestamp, write_json
 
 
 def main():
@@ -23,9 +23,6 @@ def main():
         path = Path(paths[key])
         facts[key] = {"exists": path.exists(), "path": str(path),
                       "size_bytes": path.stat().st_size if path.is_file() else None}
-    for key in ("info", "config", "baseline_log"):
-        if Path(paths[key]).is_file():
-            facts[key]["sha256"] = sha256(paths[key])
     versions = {}
     for name in ("numpy", "Pillow", "torch", "timm", "flash-attn", "spconv-cu124"):
         try:

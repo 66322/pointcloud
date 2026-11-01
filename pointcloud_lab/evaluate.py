@@ -5,7 +5,7 @@ import os
 import sys
 from pathlib import Path
 
-from .common import fresh_dir, git_state, read_json, select_infos, sha256, timestamp, write_json
+from .common import fresh_dir, git_state, read_json, select_infos, timestamp, write_json
 
 
 def main():
@@ -15,13 +15,14 @@ def main():
     parser.add_argument("--out", required=True)
     parser.add_argument("--gpu", required=True, choices=("0", "1"))
     parser.add_argument("--tokens", required=True, help="JSON list; same for every paired condition")
-    parser.add_argument("--expected-frames", type=int, default=100)
-    parser.add_argument("--allow-upstream-drift", action="store_true")
+    parser.add_argument("--expected-frames", type=int)
+    parser.add_argument("--allow-upstream-drift", action="store_true",
+                        help="Compatibility option; upstream commit is now recorded, not gated")
     args = parser.parse_args()
     # Must happen before ANY import of torch, timm, or upstream pointcept.
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     paths, experiment, tokens = read_json(args.paths), read_json(args.experiment), read_json(args.tokens)
-    if len(tokens) != args.expected_frames:
+    if args.expected_frames is not None and len(tokens) != args.expected_frames:
         raise ValueError("Token count differs from --expected-frames")
     allowed = {"id", "assignment", "camera_order", "dx", "dy", "seed", "description"}
     if set(experiment) - allowed:
@@ -33,8 +34,6 @@ def main():
                                  for k, v in (("camera_order", "normal"), ("dx", 0), ("dy", 0))):
         raise ValueError("Official assignment cannot silently apply an intervention")
     upstream = git_state(paths["ditr_root"])
-    if not args.allow_upstream_drift and upstream["sha"] != paths["expected_upstream_commit"]:
-        raise ValueError("Upstream SHA differs; inspect before --allow-upstream-drift")
     output = fresh_dir(args.out)
     write_json(output / "status.json", {"status": "running", "started_at": timestamp()})
     try:
@@ -103,17 +102,8 @@ def main():
         write_json(output / "provenance.json", {
             "created_at": timestamp(), "experiment": experiment, "paths": paths,
             "lab_git": git_state(Path(__file__).resolve().parents[1]), "upstream_git": upstream,
-            "weight_sha256": sha256(paths["weight"]),
-            "config_sha256": sha256(paths["config"]), "tokens": tokens,
-            "upstream_source_sha256": {
-                name: sha256(Path(paths["ditr_root"]) / name)
-                for name in (
-                    "pointcept/datasets/nuscenes.py", "pointcept/datasets/utils.py",
-                    "pointcept/models/point_transformer_v3/utils.py",
-                    "pointcept/models/point_transformer_v3/point_transformer_v3m1_image.py",
-                    "pointcept/engines/test.py",
-                )
-            },
+            "weight_bytes": Path(paths["weight"]).stat().st_size,
+            "tokens": tokens,
             "torch": torch.__version__, "physical_gpu_requested": args.gpu,
             "kind": "evaluation_intervention_not_retrained_method",
         })
@@ -136,6 +126,8 @@ def main():
             "peak_allocated_bytes": torch.cuda.max_memory_allocated(),
             "timing_note": "End-to-end tester wall time, not isolated model latency",
         })
+        from .results import read_test_metrics
+        write_json(output / "summary.json", read_test_metrics(output / "test.log"))
         write_json(output / "status.json", {"status": "completed", "ended_at": timestamp()})
     except Exception as error:
         write_json(output / "status.json", {

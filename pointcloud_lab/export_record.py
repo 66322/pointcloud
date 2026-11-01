@@ -3,7 +3,7 @@ import argparse
 import shutil
 from pathlib import Path
 
-from .common import read_json, sha256, write_json
+from .common import read_json, write_json
 
 ALLOWED = (
     "status.json", "preflight.json", "summary.json", "confusions.json", "per_class.csv",
@@ -23,18 +23,18 @@ def export(source, target):
     if any(x.stat().st_size > 5_000_000 for x in files) or sum(x.stat().st_size for x in files) > 10_000_000:
         raise ValueError("Evidence bundle too large; review before publication")
     target.mkdir(parents=True, exist_ok=False)
-    checksums = {}
+    manifest = {}
     for path in files:
         shutil.copy2(path, target / path.name)
-        checksums[path.name] = sha256(path)
+        manifest[path.name] = {"bytes": path.stat().st_size}
     # Keep small exact final metric lines, not the full runtime log.
     if (source / "test.log").is_file():
         lines = (source / "test.log").read_text(encoding="utf-8", errors="replace").splitlines()
         metrics = [x for x in lines if "Val result:" in x or
                    ("Class_" in x and "Result:" in x)]
         (target / "metric_lines.txt").write_text("\n".join(metrics) + "\n", encoding="utf-8")
-        checksums["metric_lines.txt"] = sha256(target / "metric_lines.txt")
-    write_json(target / "artifact_hashes.json", checksums)
+        manifest["metric_lines.txt"] = {"bytes": (target / "metric_lines.txt").stat().st_size}
+    write_json(target / "artifact_manifest.json", manifest)
     (target / "README.md").write_text(
         "# Experiment evidence\n\n"
         f"Run status: {status['status']}.\n\n"
@@ -43,6 +43,11 @@ def export(source, target):
         "A completed diagnostic/intervention is not automatically a trained-method improvement.\n",
         encoding="utf-8",
     )
+    # A batch bundles the two actual experiment results with one export command.
+    for name in ("mean_visible_cameras", "first_visible_camera"):
+        child = source / name
+        if (child / "status.json").is_file():
+            export(child, target / name)
 
 
 def main():
