@@ -1,0 +1,7 @@
+{
+  "id": "first_visible_camera",
+  "assignment": "first",
+  "camera_order": "normal",
+  "seed": 20261101,
+  "description": "First valid camera wins; all weights and TTA identical."
+}

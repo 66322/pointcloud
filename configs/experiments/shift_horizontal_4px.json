@@ -1,0 +1,9 @@
+{
+  "id": "shift_horizontal_4px",
+  "assignment": "last",
+  "camera_order": "normal",
+  "dx": 4.0,
+  "dy": 0.0,
+  "seed": 20261101,
+  "description": "Shift right 4 pixels after image resize in current TTA frame; original frustum mask retained then bounds checked. Not SE(3)/time-delay simulation."
+}

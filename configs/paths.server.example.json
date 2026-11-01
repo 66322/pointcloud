@@ -1,0 +1,11 @@
+{
+  "ditr_root": "/home/jovyan/zzx/pointcloud_repro/DITR",
+  "data_root": "/home/jovyan/zzx/pointcloud_data/processed/nuScenes_DITR",
+  "info": "/home/jovyan/zzx/pointcloud_data/processed/nuScenes_DITR/info/nuscenes_infos_10sweeps_val.pkl",
+  "baseline_predictions": "/home/jovyan/zzx/pointcloud_repro/DITR/_eval/nuscenes_val_full/result",
+  "baseline_log": "/home/jovyan/zzx/pointcloud_repro/DITR/_logs/eval_val_full.log",
+  "config": "/home/jovyan/zzx/pointcloud_repro/DITR/_weights/ditr_hf/nuscenes/semseg-ptv3_dino-L/config.py",
+  "weight": "/home/jovyan/zzx/pointcloud_repro/DITR/_weights/compatible/model_best_compat.pth",
+  "hf_cache": "/home/jovyan/zzx/pointcloud_repro/DITR/_weights/hf_cache",
+  "expected_upstream_commit": "f66d1dadb82e97ded7750567a043e4783305b01c"
+}

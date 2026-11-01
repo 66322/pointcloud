@@ -1,0 +1,3 @@
+# Use the existing server environment; do not reinstall it wholesale.
+numpy>=1.23
+Pillow>=9

@@ -1,0 +1,6 @@
+{
+  "id": "zero_point_image_features",
+  "assignment": "zero_features",
+  "seed": 20261101,
+  "description": "Zero raw point-image features; projection/BN bias can remain. Not a trained LiDAR-only baseline."
+}

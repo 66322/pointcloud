@@ -1,0 +1,7 @@
+{
+  "id": "last_camera_reversed_order",
+  "assignment": "last",
+  "camera_order": "reverse",
+  "seed": 20261101,
+  "description": "Reverse iteration; must agree with first_visible_camera at assignment level."
+}

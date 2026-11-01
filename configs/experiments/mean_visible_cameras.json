@@ -1,0 +1,7 @@
+{
+  "id": "mean_visible_cameras",
+  "assignment": "mean",
+  "camera_order": "normal",
+  "seed": 20261101,
+  "description": "Mean of valid camera patch features; no retraining, diagnostic only."
+}
