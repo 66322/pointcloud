@@ -1,0 +1,74 @@
+{
+  "kind": "read_only_preflight",
+  "created_at": "2026-11-01T08:56:57.640739+00:00",
+  "python": "3.10.12",
+  "versions": {
+    "numpy": "1.26.4",
+    "Pillow": "10.4.0",
+    "torch": "2.5.1",
+    "timm": "1.0.12",
+    "flash-attn": "2.7.0.post2",
+    "spconv-cu124": "2.3.8"
+  },
+  "upstream_git": {
+    "sha": "f66d1dadb82e97ded7750567a043e4783305b01c",
+    "dirty": "?? _eval/\n?? _logs/\n?? _weights/\n?? hub/"
+  },
+  "lab_git": {
+    "sha": "c9279d08dc4c54b72b0f68cb1a01bf29276b334f",
+    "dirty": ""
+  },
+  "expected_upstream_commit_matches": true,
+  "files": {
+    "ditr_root": {
+      "exists": true,
+      "path": "/home/jovyan/zzx/pointcloud_repro/DITR",
+      "size_bytes": null
+    },
+    "data_root": {
+      "exists": true,
+      "path": "/home/jovyan/zzx/pointcloud_data/processed/nuScenes_DITR",
+      "size_bytes": null
+    },
+    "info": {
+      "exists": true,
+      "path": "/home/jovyan/zzx/pointcloud_data/processed/nuScenes_DITR/info/nuscenes_infos_10sweeps_val.pkl",
+      "size_bytes": 106249034,
+      "sha256": "f74483c13c89eb23e7a7186a088c66ecb40663ac446bf912abd69e8e8fa0b0e3"
+    },
+    "baseline_predictions": {
+      "exists": true,
+      "path": "/home/jovyan/zzx/pointcloud_repro/DITR/_eval/nuscenes_val_full/result",
+      "size_bytes": null
+    },
+    "baseline_log": {
+      "exists": true,
+      "path": "/home/jovyan/zzx/pointcloud_repro/DITR/_logs/eval_val_full.log",
+      "size_bytes": 6322822,
+      "sha256": "d2f74ecebcdfbc13be652d32fc644d944c22019621234055e0523fcc13ad7e3e"
+    },
+    "config": {
+      "exists": true,
+      "path": "/home/jovyan/zzx/pointcloud_repro/DITR/_weights/ditr_hf/nuscenes/semseg-ptv3_dino-L/config.py",
+      "size_bytes": 6878,
+      "sha256": "2f642d2fd5bedea3e5123f70d3b87a2ae4fa996e06527c1a2fbf4a42c0bd19fe"
+    },
+    "weight": {
+      "exists": true,
+      "path": "/home/jovyan/zzx/pointcloud_repro/DITR/_weights/compatible/model_best_compat.pth",
+      "size_bytes": 1778408760
+    },
+    "hf_cache": {
+      "exists": true,
+      "path": "/home/jovyan/zzx/pointcloud_repro/DITR/_weights/hf_cache",
+      "size_bytes": null
+    }
+  },
+  "baseline_prediction_count": 6019,
+  "strict_checkpoint_loading": "NOT_CHECKED; requires the GPU evaluation smoke run",
+  "actual_dino_freeze": "NOT_CHECKED; checked by eval runner after model construction",
+  "CUDA_VISIBLE_DEVICES_before_run": null,
+  "baseline_result_lines": [
+    "[2026-11-01 15:13:02,333 INFO test.py line 336 3768320] Val result: mIoU/mAcc/allAcc 0.8248/0.9003/0.9463"
+  ]
+}
