@@ -1,142 +1,111 @@
 # DITR实验总表
 
-当前约定（2026-11-01）：基线已经复现，直接推进实验；新入口单帧可跑即可，不设置20/100帧多级关卡。
+更新日期：2026-11-02。来源是用户回传的服务器日志/报告/两份最终summary JSON；最近带时间的完成事件为北京时间14:15:23，随后确认下一批START。未直连服务器，不把回执中的running写成实时保证。
 
-## 已有基础
+换电脑先读[HANDOFF](HANDOFF.md)。数值依据按批次存放在[records/experiments](../records/experiments/README.md)，运行手册中的历史命令不代表需要重跑。
 
-- 数据/环境/兼容权重可用，服务器9项测试已通过，结果已同步GitHub。
-- 已有正式完整nuScenes val：82.48% mIoU、90.03% mAcc、94.63% OA。
-- 作者83.1%只作参考，不为了追分反复调整或复现。
-- 旧100帧与6019帧离线诊断已结束；统计映射原始20误记为motorcycle，已修复。
-- 旧84.3997%/81.7190%不能用作有效改进分数；无需再做一轮全量诊断。
-- 不再例行扫描文件、权重、索引或点数组SHA。代码commit只记录，不设一致性阻断。
+## 共同协议与已有基础
 
-更正说明：[诊断映射错误](../records/analyses/diagnostic_mapping_correction_20261101.md)。
+- nuScenes lidarseg 16类，28130条train索引、完整val6019帧；PTv3+DINOv2-L，DINO冻结/eval。
+- 历史完整val基线82.48% mIoU、90.03% mAcc、94.63% OA；作者83.1%仅参考。
+- 两轮微调：单模型单GPU batch6，4688步/轮，共9376次计划迭代；seed20261101，max_lr2e-4、block组0.1倍；原AdamW、增强、损失、AMP和TTA。
+- 每组从同一个原兼容checkpoint开始；只评价最后checkpoint一次，不逐轮完整验证或选best。原3D网络/图像投影/分类头继续训练，不只是训练新增模块。
+- 十轮任务从原checkpoint重新开始，独立十轮OneCycle、46880次计划迭代；与十轮control比较，不能改旧两轮epochs后当同一实验续训。
+- 成功更新/AMP跳步与计划迭代分开记录。所有运行只用GPU0/1、独立输出、nohup。
+- 接受已有基线，新路径一次确认可运行后直接实验；不重复基线、20/100帧关卡或例行SHA检查。
 
-## 已完成的推理实验
+旧100帧/全量离线诊断已结束，其84.3997%/81.7190%受原始标签20映射错误影响，撤回为有效指标。纯几何统计与标签相关统计分开看，不要求重跑旧诊断。[更正](../records/analyses/diagnostic_mapping_correction_20261101.md)
 
-入口及命令见[RUNBOOK](RUNBOOK.md)。一次启动：一帧mean确认 → 两卡完整val实验 → 自动汇总。
+## 1. 无需训练的推理对照：已完成
 
-| ID | 方法 | 变化因素 | GPU | 状态 |
-|---|---|---|---|---|
-| BASE | 已有DITR+DINOv2-L | 默认赋值 | 已完成 | 82.48%，沿用 |
-| VIEW-MEAN | 有效多视图均值 | 点级图像特征选择/聚合 | 0 | r02 completed；82.64%，+0.16pp |
-| VIEW-FIRST | 首有效视图 | 重叠点的观测选择 | 1 | r02 completed；82.55%，+0.07pp |
+| 方法 | 要验证的问题 | mIoU % | 相对历史基线 pp |
+|---|---|---:|---:|
+| BASE 原赋值 | 已有复现基准 | 82.48 | 0.00 |
+| VIEW-MEAN | 有效多视图均值是否优于后视图覆盖 | 82.64 | +0.16 |
+| VIEW-FIRST | 首有效视图选择是否影响重叠点预测 | 82.55 | +0.07 |
 
-两项使用原权重与相同TTA、完整验证集。结果从原作者SemSegTester直接读取，
-不再经过自定义离线标签映射。正负结果都记录；不要求重新训练默认基线。
+r02于2026-11-01 19:38:55 completed，原权重/原TTA/完整6019帧。mean/first的mAcc为90.06/89.94%，OA和逐类尚待回传。单次小幅差异保留为线索，不重跑完整val追分。[批次依据](../records/experiments/view_assignment_fullval_20261101_r02/README.md)
 
-首次启动r01在模型构造时失败：timm尝试读取DINO预训练缓存，而离线模式下
-未找到所需文件。已改为本地构建DINO结构，再严格加载包含DINO参数的完整兼容
-checkpoint，不重新下载。r01保留失败记录，r02单帧已通过并启动两项正式实验。
-用户末帧回执确认两项均已遍历6019帧，时间为19:38:54/19:38:49。
-mean累计mIoU/mAcc=82.64%/90.06%，first=82.55%/89.94%。
-括号内mIoU是累计交并集的全局值，不是逐帧mIoU的平均；
-用户补充最终status.json=completed，UTC结束时间11:38:55.907847（北京时间19:38:55）。
-report.md确认上述两项mIoU与差值；OA/逐类summary尚未收到，完整轻量导出尚未上传。
-见[末帧记录](../records/analyses/view_assignment_r02_last_frame_20261101.md)。
-本批没有训练新权重；mean优先保留，单次小幅提升先作候选线索。
-不要求重复推理来确认小幅差异。后续长任务默认nohup启动，记录PID和日志。
+## 2. 同预算两轮训练与clean验证
 
-## 结果判读与下一步
+旧四组finetune_stage1_20261101_r02已于2026-11-02 00:50:19 completed；其8个训练/验证节点被multi_route_20261101_r01复用。后者新增九组短训中七组完成、两组失败。因此13种定义中11组已有clean结果，复用不算独立重复。
 
-- mean改善：下一步试简单质量加权，并决定是否训练聚合。
-- first改善：检查视图质量/顺序影响，继续固定规则质量选择。
-- 两者无收益：记录现有权重对聚合变化的反应，转局部取样、轻量门控或模态dropout训练。
-- 不因推理时均值下降就宣称重新训练聚合一定无效；它可能有分布变化。
+| 方法 | 唯一处理变化 | 要验证的问题 | mIoU % | 相对两轮control pp |
+|---|---|---|---:|---:|
+| control | 原赋值/加法继续训练 | 分离额外训练预算本身的影响 | 82.20 | 0.00 |
+| gate | 四级图像注入的恒等初始化门控 | 学习注入强度是否优于原加法 | 82.21 | +0.01 |
+| mean | 有效多视图特征均值 | 重新训练适配均值后是否有收益 | 82.47 | +0.27 |
+| camera_dropout | 逐相机 p=0.2 删除对应证据 | 正常精度与缺相机能力的取舍 | 82.04 | -0.16 |
+| center_select | 图像中心质量代理 top-1 | 固定质量选择是否优于原选择/均值 | 82.46 | +0.26 |
+| center_weighted | 中心质量代理加权 | 固定质量加权是否优于等权均值 | 82.42 | +0.22 |
+| bilinear | 对齐后的双线性取样 | 离散 nearest 取样是否限制融合 | 82.36 | +0.16 |
+| local_average | 3×3 有效图像 token 邻域均值 | 无参数局部上下文是否有益 | 81.86 | -0.34 |
+| local_attention | xyz/strength 查询的3×3局部注意力 | 学习局部对应是否优于原取样/局部均值 | 82.21 | +0.01 |
+| valid_mask | 投影后无观测点零注入 | 无对应图像支路的偏置是否影响结果 | 82.06 | -0.14 |
+| valid_pool | 图像池化排除无效项 | 无效零值是否压过有效负特征 | 训练失败 | — |
+| valid_both | 有效性 mask 与有效池化组合 | 两种处理是否需要共同传播 | 训练失败 | — |
+| whole_camera_dropout | p=0.2 整组六相机证据丢弃 | 显式整组缺失训练是否优于逐相机 dropout | 82.41 | +0.21 |
 
-## 多路线保留
+control/gate/mean/camera_dropout均完成9376次计划迭代，成功optimizer更新分别9371/9372/9371/9371；由差值推算AMP跳步5/4/5/5。七组新增成功训练的更新数尚待train/summary.json。
 
-完整实施状态与下一批任务见[EXPERIMENT_MATRIX](EXPERIMENT_MATRIX.md)。
-旧r02只含四组微调。新增[无人值守接续队列](CAMPAIGN_RUNBOOK.md)已实现，
-服务器待一次启动：新增9组两轮短训、6组十轮训练、27次完整评价；
-复用旧四组正常完成的8个训练/评价节点。质量代理选视图、局部取样、有效性池化、
-整组相机dropout和配对压力评价已接入；显式r/u、蒸馏等仍未实现。
+normal-input观察：mean/中心选择/中心加权/整组dropout/bilinear分别较同预算control高0.27/0.26/0.22/0.21/0.16pp。control比历史基线低0.28pp；当前全部两轮clean结果未超过82.48%，不把相对训练control的恢复写成已刷新历史最佳。gate与local_attention各+0.01pp不足以建立稳定优势；短训负结果也不证明整条研究路线无效。
 
-| 路线 | 具体改法 | 最小实验 | 优先条件 |
-|---|---|---|---|
-| A 输入证据 | 单视图质量选择、几何质量加权聚合 | 本批均值/首视图 | 完整val是否有收益 |
-| B 局部对应 | 局部token候选或几何约束选择 | nearest vs局部；单因素 | 小目标/边界错误是否改善 |
-| C 融合决策 | 普通门控，再试可信度/互补价值 | 加法/普通门控/所提机制 | 同参数、同训练预算比较 |
-| D 鲁棒训练 | 相机dropout、按需选择性蒸馏 | 同训练预算有/无dropout | 正常精度与相机缺失性能 |
+[四组微调证据](../records/experiments/finetune_stage1_20261101_r02/README.md) · [多路线证据/CSV](../records/experiments/multi_route_20261101_r01/README.md)
 
-本批推理不作为实现训练代码的前置关卡；可同步准备训练模块与入口。
-不会因这两个推理干预下降就排除对应的重新训练路线。
-完整研究细节见[历史规划](research/20261101_multi_route_plan.md)，其早期多级准备建议已被当前约定替代。
+## 3. 缺相机配对验证：部分完成
 
-## 第一批真实训练
+目的：在同一相机子集下比较control、逐相机dropout、整组dropout，区分正常精度与缺失鲁棒性。
 
-训练入口、四个处理分支与nohup队列已实现，本地Torch 2.5.1 CPU测试通过。
-服务器r01的control/gate已读到28130条train索引，完成模型/权重构造，
-随后在优化器构造阶段因param_dicts内为普通dict而失败，尚未前向/反向或更新参数。
-现已改用原项目ConfigDict，并增加原版优化器/调度器集成回归。
-保留r01快照和失败日志，新批次改用finetune_stage1_20261101_r02。
-原始训练帧在实际加载时使用，缺哪个再补，不先扫描全量数据或下载第二个数据集。
+| 方法 | clean 6路 | 固定3路 | 固定1路 | 0路图像证据 |
+|---|---:|---:|---:|---:|
+| control | 82.20 | 60.79 | 49.20 | 36.80 |
+| camera_dropout | 82.04 | 73.13 | 最近回执运行中 | 最近回执运行中 |
+| whole_camera_dropout | 82.41 | 最近完整快照待执行 | 最近完整快照待执行 | 最近完整快照待执行 |
 
-最新服务器回执（截至20:50:40）：r02的control/GPU0和gate/GPU1均通过首次真实
-参数更新检查，DINO冻结/eval、前向/反向及首次checkpoint保存已走通，迭代已至140/9376。
-最近120步约0.46s/步，当前继续运行；不是完成结果，不重新启动。
-见[H100首次更新回执](../records/analyses/finetune_stage1_r02_first_updates_20261101.md)。
+- 固定子集：3路=[0,2,4]、1路=[0]、0路=[]，不是全部组合均值。
+- camera_dropout三路相对同条件control +12.34pp，clean−0.16pp。clean→三路降幅control21.41pp、dropout8.91pp，降幅差12.50pp。
+- 当前结论限于本次训练与固定三路条件；1/0路及整组dropout未收到最终分数。
+- 零相机证据不等于另训的纯LiDAR模型，也不能据仍读取/编码图像的实现宣称计算加速。
+- 已收到两份完整16类summary：control零路36.80/44.59/85.42，dropout三路73.13/81.12/93.68（mIoU/mAcc/OA，%）。
 
-启动命令见[TRAINING_RUNBOOK](TRAINING_RUNBOOK.md)。第一批的第一次真实更新
-检查前向/反向、DINO冻结并保存checkpoint，通过后直接继续，无独立试训练关卡。
+[逐类结果及来源](../records/experiments/multi_route_20261101_r01/README.md)
 
-固定协议configs/training/stage1.json：每项2 epoch，单卡batch6，max_lr=2e-4，
-block组比例0.1，seed=20261101；AdamW/损失/训练变换/AMP沿用作者配置，
-OneCycleLR保留原曲线形状、按本轮步数计算。每项同一个初始兼容checkpoint，
-同一train split、样本顺序/增强/Mix3D决策、名义步数、最终原版完整TTA。
-AMP实际成功更新与跳步数分别记录；不把名义步数冒充成功更新次数。
+## 4. 投影偏移评价：已排队，尚无结果
 
-| ID | 训练变化 | 作用 | 代码状态 |
-|---|---|---|---|
-| TRAIN-CTRL | 原融合方式继续训练 | 分离额外训练预算与新模块的贡献 | r02 H100首步通过，20:50为140/9376 |
-| TRAIN-GATE | 四级图像注入处1+tanh门控，末层零初始化 | 学习融合强度，初始保持原函数 | r02 H100首步通过，20:50为140/9376 |
-| TRAIN-MEAN | 多视图均值，单独重新训练适配 | 接续本轮+0.16pp线索 | 同队列等待前两项完成 |
-| TRAIN-DROP | 每样本每相机p=0.2丢弃对应证据，独立RNG | 相机dropout路线；不叠加门控 | 同队列等待前两项完成 |
+control/bilinear/local_attention三个两轮模型，各在resize后横向+4px条件下完整val。验证对应错位敏感性；与同样+4px的control比较，而非正常输入control。它是像素错位压力测试，不是SE(3)外参扰动。最近完整队列表中三项pending，之后没有新回执。
 
-GPU0先对照，GPU1先门控，各自在训练进程退出后启动最终完整val，随后利用空出的卡
-安排mean/dropout。此版是单卡相同batch的四组比较；若batch6不适合实际显存，
-应统一修改协议后用新批次名启动，不单独给某个方法降batch。
-每项仅评最终checkpoint，不逐epoch全量验证或选best，不另跑未训练基线。
-最初2 epoch用于真实训练筛选，不能据单次结果宣称收敛或稳定贡献。
-2轮是首筛预算，不是原论文要求或已验证的最佳训练长度；实现正常但短训未提升的路线
-保留中等预算复核。每轮4688个batch，两轮共9376次计划迭代，详细更新范围见矩阵说明。
-dropout首轮clean结果不证明相机缺失鲁棒性，后续针对候选再设计退化评价。
-不将上述拟定训练计划写成已运行或已有效的实验。
+## 5. 十轮训练：已排队，尚无最终结果
 
-## 保持实验定义的性能改动
+预先固定control、gate、center_select、local_attention、valid_both、whole_camera_dropout，检验短训观察在较长相同预算下是否保留。除valid_both外的五项最近完整快照待执行；valid_both因短训失败，训练和评价均blocked。
 
-见[执行性能记录](../records/analyses/inference_execution_20261101.md)。
-新入口默认原始帧并行读、按原顺序后台准备、帧内冻结DINO精确输入缓存，
-不改TTA、图像尺寸、体素大小、权重、数值精度或指标。
-原测试流程包含随机GridSample，不能直接加DataLoader进程并宣称抽样不变；
-当前实现保留同进程有序随机变换，并不重复播种。
-首个实际帧同步完成，后续再预取，以免懒编译与数据随机调用交错。
-本地可运行测试通过；H100提速幅度待真实日志，不要求为工程测时重跑当前r02。
+晋级依据是短训与clean评价执行成功，不按两轮分数取消预定十轮路线。十轮不是已证明收敛的最终训练；各候选必须与十轮control比较，后续再对少量候选做必要多seed/消融/泛化验证。
 
-## 记录与评价
+## 6. 故障、机器重启和最近任务
 
-- 保存配置、commit、seed、实验日志、整体/逐类指标、耗时与显存。
-- 每项使用独立runs目录；GitHub只保存records中的轻量结果。
-- 初试用于找有效方向，最终论文阶段再做必要消融、多种子和泛化验证。
-- 需要训练的新模块先确认一次前向/反向正常，再训练，不对未改动部分重复验证。
-- 如实记录失败，不编造指标，不用旧预测冒充新方法。
+- valid_pool与valid_both在首次loss检查报Non-finite first training loss，尚无首次成功更新。共同池化路径是排查范围，具体根因尚未定位；不是方法无收益。
+- 依赖阻断4节点：screen_valid_pool_clean、screen_valid_both_clean、medium_valid_both_train、medium_valid_both_clean。其余独立任务继续。
+- 用户报告11月2日10点多机器重启。两项中断验证旧输出/日志已保留归档，重新排队从头算；已有完成结果保留。
+- 恢复父PID59334；dropout三路PID59343于14:15:03结束，control零路PID59338于14:15:23结束。
+- 随后确认：GPU1启动robust_camera_dropout_cam1（PID100312），GPU0启动robust_camera_dropout_cam0（PID100432）。这是回执时刻状态，不是实时查询。
+- 10:24快照counts为reused8/completed16/failed2/blocked4/running2/pending18；之后未收到完整queue.json，不把旧计数当最新。
 
-## 无人值守多路线任务（代码交付，服务器待启动）
+[恢复记录与原恢复脚本边界](../records/analyses/campaign_restart_20261102.md)
 
-见configs/training/multi_route_queue.json、pointcloud_lab/campaign.py。
-新任务沿用已准备好的原数据与权重，不添加全量扫描/哈希或小样本多级验证。
-等待旧r02终态后复用可用同预算结果；只调度GPU0/1，任何外部GPU进程存在时不抢占。
-每个方法首次真实更新通过后直接继续；独立失败不终止其他路线。
+## 7. 每条路线需要补齐的证据
 
-- 两轮新增：center_select、center_weighted、bilinear、local_average、
-  local_attention、valid_mask、valid_pool、valid_both、whole_camera_dropout。
-- 十轮预先固定：control、gate、center_select、local_attention、valid_both、whole_camera_dropout；
-  重新从原权重按十轮调度训练，不用两轮分数作为取消条件。
-- 正常完整val共15次；短训control/camera_dropout/whole_camera_dropout的3/1/0相机
-  评价共9次；短训control/bilinear/local_attention的横向4像素错位评价共3次。
-- 两轮、十轮、缺相机和偏移分别使用对应control；对照不混用。
-- 结果集中runs/multi_route_20261101_r01，完成后统一导出到records/experiments同名目录。
+| 路线 | 当前已回答的部分 | 仍要验证 |
+|---|---|---|
+| 输入选择/聚合 | 推理mean/first、训练mean/中心代理均已有分数 | 十轮中心选择、逐类/分组收益，必要时参数与预算匹配 |
+| 局部对应 | bilinear/局部均值/局部注意力短训已有分数 | 配对4px、十轮注意力；额外参数容量消融；语义query/几何约束尚未实现 |
+| 有效性传播 | valid_mask有clean结果 | 修复并新批次补跑valid_pool/both，再做单项/组合对照 |
+| 融合门控 | 普通gate短训已有分数 | 十轮gate；显式可信度r/互补价值u仍未实现，不能用普通gate代替 |
+| 鲁棒训练 | 固定三路dropout比control高12.34pp | 1/0路、整组dropout配对、必要多seed/更多子集，正常精度一并报告 |
+| 完整方法结论 | 单seed筛选及部分压力评价 | 少量候选的充分训练/多seed/必要消融和泛化；不把6019帧当6019次训练重复 |
 
-中心质量只是几何代理，local query当前是原始xyz/strength而非编码后语义，
-固定相机子集不是所有组合，4px不是SE(3)。本批CPU检查不冒称H100实跑或方法有效。
+## 8. 记录与双电脑交接
+
+每次新回执更新docs/HANDOFF.md和本表，在records/experiments/<run_id>/保留来源、日期/时区、配置/执行commit（未知写未知）、方法/预算/条件、最终指标、失败/恢复和下一步。完整16类JSON保持原回传值；展示表可四舍五入，原缺失字段保持null。
+
+本次是用户服务器回执整理，不是完整export_record导出或独立重跑。尚缺多数逐类/有效配置/实际快照commit、更新与AMP统计、runtime和显存。记录提交commit不能冒充实验执行commit。
+
+两机开发/服务器先git pull --ff-only；不force push。运行使用已保存代码快照，拉取文档不改变排队任务。大权重、预测、数据、大日志和凭据不提交。[同步约定](GITHUB_SYNC.md) · [描述性校核](../records/analyses/results_interpretation_20261102.md)

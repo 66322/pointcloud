@@ -29,3 +29,15 @@
 - Publish reviewed lightweight outputs under records/experiments/<run_id>/.
   Describe failed results honestly. Separate reported, locally tested,
   server-verified, and scientifically supported claims.
+
+- User preference (2026-11-02): two computers alternate development. Read
+  docs/HANDOFF.md and docs/EXPERIMENT_MASTER.md before work. Keep the latest
+  user-reported server receipts, findings, failures and restart history under
+  records/experiments/<run_id>/ and records/analyses/, and update the handoff,
+  master and matrix together. Sync reviewed lightweight records to GitHub main.
+- Label receipt time/source and missing fields explicitly. A record commit is
+  not the experiment's execution commit. Do not invent server status/provenance
+  or treat an old running/PID/Counter snapshot as live state.
+- Existing campaign resume adopts live children; dead unfinished jobs after a
+  machine reboot are otherwise marked failed. See the documented 2026-11-02
+  recovery before recommending resume. Preserve interrupted outputs/logs.

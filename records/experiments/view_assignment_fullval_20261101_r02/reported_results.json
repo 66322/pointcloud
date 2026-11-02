@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "run_id": "view_assignment_fullval_20261101_r02",
+  "evidence": {
+    "source_type": "user_pasted_server_receipt",
+    "archive_date": "2026-11-02",
+    "timezone": "Asia/Shanghai",
+    "independently_read_from_server": false,
+    "independent_rerun": false,
+    "actual_server_snapshot_commit": null,
+    "missing_values_are": "not received; never fill from another method or condition"
+  },
+  "reported_run_status": "completed",
+  "reported_end_at": "2026-11-01T19:38:55.907847+08:00",
+  "reported_source_commit_prefix": "3f0003d",
+  "val_frames": 6019,
+  "training": false,
+  "baseline_miou_pct": 82.48,
+  "results": [
+    {
+      "method": "mean_visible_cameras",
+      "miou_pct": 82.64,
+      "macc_pct": 90.06,
+      "oa_pct": null,
+      "delta_vs_baseline_pp": 0.16
+    },
+    {
+      "method": "first_visible_camera",
+      "miou_pct": 82.55,
+      "macc_pct": 89.94,
+      "oa_pct": null,
+      "delta_vs_baseline_pp": 0.07
+    }
+  ]
+}

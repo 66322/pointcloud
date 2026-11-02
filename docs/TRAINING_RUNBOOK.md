@@ -1,24 +1,19 @@
 # 同预算训练：服务器执行
 
-**当前已启动旧r02，不要重复本页的旧启动命令。**
-要现在追加后续任务，执行[无人值守接续队列](CAMPAIGN_RUNBOOK.md)的一次启动：
-新队列等待旧批结束，复用完成项，再跑9组短训、6组十轮及配对压力评价。
-两张卡自动接续，无需隔几个小时回来选方法。
+**2026-11-02更新：四组r02已全部完成，结束于北京时间00:50:19。**
+control82.20%、gate82.21%、mean82.47%、camera_dropout82.04%；前两项成功更新9371/9372，后两项各9371。
+[结果依据](../records/experiments/finetune_stage1_20261101_r02/README.md) · [当前交接](HANDOFF.md)。
 
-已有推理r02已完成：mean82.64%，first82.55%。无需重复评测。
-本页启动的是从现有兼容checkpoint开始的真实训练，不是再次推理或环境诊断。
-本地Torch 2.5.1 CPU共29项测试通过，含原版优化器/调度器接口回归。
-r01在优化器构造时因配置类型适配失败，已修复；
-r02已于20:49完成H100首次更新及checkpoint保存，20:50两组均到140/9376。
-当前control/gate训练继续，mean/dropout会自动接续，不要重复启动。
+原推理r02也已完成：mean82.64%、first82.55%。多路线r01已复用这四组的8个节点并继续运行，不重复启动旧批次。
+本页保留训练协议与历史操作；优化器适配r01失败和修复见原记录，本地测试不代替服务器结果。
 
 ## 启动
 
-以下仅供尚未启动本批次时使用，已运行的r02无需执行。
+以下是本批首次启动的历史命令，r02已完成；新实验必须使用新run_id，不重复执行旧命令。
 
 ~~~bash
 cd /home/jovyan/zzx/pointcloud
-git pull --rebase
+git pull --ff-only
 conda activate pointcept-torch2.5.0-cu12.4
 bash scripts/start_training_experiments.sh finetune_stage1_20261101_r02
 ~~~
@@ -67,10 +62,8 @@ tail -n 10 runs/finetune_stage1_20261101_r02/gate_train_console.log
 
 每20次训练步打印实际每步耗时、阻塞取数耗时、loss及ETA。首次模型加载、数据进程
 启动和DINO编译需要时间，前几步ETA会偏大，以后续实际日志为准，不预报固定总时长。
-当前实现的ETA使用从启动起的累计均值，因此140步时仍受首步约80秒开销影响。
-按20:50回执最近120步约0.46s/步估，当前两项训练余下约71分钟，
-只作为维持该速度的条件估计，不包含最终完整val及后续mean/dropout。
-
+2026-11-01 20:50的140步回执只是历史启动记录。最终四组已完成9376次计划迭代，端到端累计wall/step约control0.467、gate0.470、mean0.480、camera_dropout0.477秒；不是独立GPU算子耗时。
+当前进度应查看multi_route_20261101_r01的恢复日志，见[HANDOFF](HANDOFF.md)。
 nohup已接好stdin/stdout/stderr并记录PID，普通网页断开不会依赖终端存活。
 不要因没看到新的终端输出重复启动；新批次必须使用新目录名。
 如某项失败，队列只终止自己创建的其他训练/验证进程，保留checkpoint与错误日志。
@@ -119,10 +112,10 @@ CUDA_VISIBLE_DEVICES=0 nohup python -u -m pointcloud_lab.train \
 ~~~bash
 python -m pointcloud_lab.export_record \
   --run runs/finetune_stage1_20261101_r02 \
-  --record records/experiments/finetune_stage1_20261101_r02
+  --record records/experiments/finetune_stage1_20261101_r02/server_export_20261102
 git add records/experiments/finetune_stage1_20261101_r02
 git commit -m "Record paired DITR fine-tuning experiments"
-git pull --rebase
+git pull --ff-only
 git -c credential.helper= push origin main
 ~~~
 

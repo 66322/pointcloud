@@ -1,0 +1,5 @@
+method,miou_pct,delta_vs_trained_control_pp,planned_iterations_completed,optimizer_updates,amp_skipped_steps_inferred,evidence
+control,82.20,0.00,9376,9371,5,user_pasted_server_receipt
+gate,82.21,0.01,9376,9372,4,user_pasted_server_receipt
+mean,82.47,0.27,9376,9371,5,user_pasted_server_receipt
+camera_dropout,82.04,-0.16,9376,9371,5,user_pasted_server_receipt

@@ -1,4 +1,49 @@
-# GitHub同步：HTTPS 403处理
+# GitHub同步与两台电脑交接
+
+2026-11-02用户约定：GitHub main保存最新代码、轻量实验结果与交接；两台电脑轮流开发。服务器由用户执行命令，完整产物仍留runs/，GitHub不是实时进度镜像。
+
+## 每次接手
+
+~~~bash
+git status --short
+git pull --ff-only
+~~~
+
+先读[HANDOFF](HANDOFF.md)、[EXPERIMENT_MASTER](EXPERIMENT_MASTER.md)、[EXPERIMENT_MATRIX](EXPERIMENT_MATRIX.md)。本地有修改先保留；如果分支分叉，检查双方提交并合并处理，不用force push或reset --hard覆盖另一台电脑。
+
+服务器已有run使用启动时的code/计划/路径快照，git pull更新文档不会改变它；不要为同步文档重启实验。
+
+## 新回执写到哪里
+
+| 内容 | 文件位置 |
+|---|---|
+| 最新运行/完成/失败状态、接手动作 | docs/HANDOFF.md |
+| 实验问题、对照、已有分数、待验证项 | docs/EXPERIMENT_MASTER.md、EXPERIMENT_MATRIX.md |
+| 用户回传结果JSON/CSV、短日志、逐类JSON | records/experiments/<run_id>/ |
+| 结论边界、故障、重启恢复 | records/analyses/ |
+
+每次同时更新来源、日期/时区和观察时刻。保留所有正负结果，未知字段留null；旧running/PID/任务计数不当实时数据。报告中执行commit与本次记录commit分开，实际运行快照未知就写未知。
+
+当前目录已有回执，完整export_record产物用同目录下全新的server_export_日期时间子目录。正在运行的队列不整批导出；机器重启归档目录的导出边界见[恢复记录](../records/analyses/campaign_restart_20261102.md)。
+
+## 提交与同步
+
+检查差异后，只加入本次修改的确切docs/records路径并提交。推送前再拉取：
+
+~~~bash
+git diff --check
+git status --short
+git pull --ff-only
+git push origin main
+~~~
+
+若存在尚未推送的本地提交且main已被另一台电脑推进，保留双方提交、检查差异后完成合并再正常push；不要直接丢弃结果。无写权限时按下方处理，或使用当前已授权GitHub连接提交。不要在聊天或文件里保存token。
+
+不提交数据、权重、逐点预测、完整大日志、凭据。每次结果同步不要求重新运行实验或重复export。
+
+---
+
+# HTTPS 403处理（故障排查）
 
 适用：clone/pull成功，push提示Permission to 66322/pointcloud.git denied to 66322。
 这说明当前写入鉴权未通过；单靠该输出不能确定是token仓库范围、写权限、
@@ -28,7 +73,7 @@ cd /home/jovyan/zzx/pointcloud
 git status --short
 git log -2 --oneline
 git remote get-url origin
-git pull --rebase
+git pull --ff-only
 git -c credential.helper= push origin main
 ~~~
 

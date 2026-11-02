@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "evidence": {
+    "source_type": "user_pasted_server_receipt",
+    "archive_date": "2026-11-02",
+    "timezone": "Asia/Shanghai",
+    "independently_read_from_server": false,
+    "independent_rerun": false,
+    "actual_server_snapshot_commit": null,
+    "missing_values_are": "not received; never fill from another method or condition"
+  },
+  "plan_total_nodes": 50,
+  "snapshots": [
+    {
+      "at": "2026-11-02T10:24:42+08:00",
+      "source": "user-pasted Counter(queue.json) and log output",
+      "counts": {
+        "reused": 8,
+        "completed": 16,
+        "failed": 2,
+        "blocked": 4,
+        "running": 2,
+        "pending": 18
+      },
+      "active_jobs": [
+        {
+          "id": "robust_control_cam0",
+          "gpu": 0,
+          "pid": 188329,
+          "frame_processing": 3931,
+          "frames_total": 6019
+        },
+        {
+          "id": "robust_camera_dropout_cam3",
+          "gpu": 1,
+          "pid": 192877,
+          "frame_processing": 2919,
+          "frames_total": 6019
+        }
+      ]
+    },
+    {
+      "at": "2026-11-02T12:41:34+08:00",
+      "source": "user-pasted post-reboot logs",
+      "counts": null,
+      "controller_pid": 59334,
+      "active_jobs": [
+        {
+          "id": "robust_control_cam0",
+          "gpu": 0,
+          "pid": 59338,
+          "frame_processing": 209,
+          "frames_total": 6019
+        },
+        {
+          "id": "robust_camera_dropout_cam3",
+          "gpu": 1,
+          "pid": 59343,
+          "frame_processing": 207,
+          "frames_total": 6019
+        }
+      ]
+    }
+  ],
+  "latest_receipt": {
+    "last_timed_completed_event_at": "2026-11-02T14:15:23.358+08:00",
+    "observation_time_not_provided": true,
+    "counts": null,
+    "completed_transitions": [
+      {
+        "id": "robust_camera_dropout_cam3",
+        "evaluation_end_at": "2026-11-02T14:15:03.374+08:00",
+        "miou_pct": 73.13
+      },
+      {
+        "id": "robust_control_cam0",
+        "evaluation_end_at": "2026-11-02T14:15:23.358+08:00",
+        "miou_pct": 36.8
+      }
+    ],
+    "newly_started_jobs": [
+      {
+        "id": "robust_camera_dropout_cam1",
+        "gpu": 1,
+        "pid": 100312
+      },
+      {
+        "id": "robust_camera_dropout_cam0",
+        "gpu": 0,
+        "pid": 100432
+      }
+    ],
+    "note": "Full queue.json was not re-read at this event; do not reuse 10:24 counts as current counts."
+  }
+}

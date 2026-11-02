@@ -1,0 +1,355 @@
+{
+  "schema_version": 1,
+  "run_id": "multi_route_20261101_r01",
+  "evidence": {
+    "source_type": "user_pasted_server_receipt",
+    "archive_date": "2026-11-02",
+    "timezone": "Asia/Shanghai",
+    "independently_read_from_server": false,
+    "independent_rerun": false,
+    "actual_server_snapshot_commit": null,
+    "missing_values_are": "not received; never fill from another method or condition"
+  },
+  "reported_run_status": "running_at_last_receipt",
+  "reported_started_at": "2026-11-02T00:50:21.448893+08:00",
+  "latest_timed_completed_event": "2026-11-02T14:15:23.358+08:00",
+  "latest_receipt_observation_time": null,
+  "protocol": {
+    "dataset": "nuScenes lidarseg",
+    "num_classes": 16,
+    "train_index_frames": 28130,
+    "val_frames": 6019,
+    "epochs": 2,
+    "batch_size_per_model": 6,
+    "steps_per_epoch": 4688,
+    "planned_iterations": 9376,
+    "seed": 20261101,
+    "max_lr": 0.0002,
+    "block_lr_ratio": 0.1,
+    "teacher": "DINOv2-L frozen/eval",
+    "checkpoint_selection": "final epoch only",
+    "validation": "upstream SemSegTester full val with original TTA",
+    "protocol_source": "checked-in configs and user terminal receipts; complete effective server artifacts not received"
+  },
+  "normal_input_results": [
+    {
+      "method": "control",
+      "miou_pct": 82.2,
+      "change": "原赋值/加法继续训练",
+      "question": "分离额外训练预算本身的影响",
+      "optimizer_updates": 9371,
+      "delta_vs_trained_control_pp": 0,
+      "status": "completed",
+      "evidence_source": "stage1_report_receipt"
+    },
+    {
+      "method": "gate",
+      "miou_pct": 82.21,
+      "change": "四级图像注入的恒等初始化门控",
+      "question": "学习注入强度是否优于原加法",
+      "optimizer_updates": 9372,
+      "delta_vs_trained_control_pp": 0.01,
+      "status": "completed",
+      "evidence_source": "stage1_report_receipt"
+    },
+    {
+      "method": "mean",
+      "miou_pct": 82.47,
+      "change": "有效多视图特征均值",
+      "question": "重新训练适配均值后是否有收益",
+      "optimizer_updates": 9371,
+      "delta_vs_trained_control_pp": 0.27,
+      "status": "completed",
+      "evidence_source": "stage1_report_receipt"
+    },
+    {
+      "method": "camera_dropout",
+      "miou_pct": 82.04,
+      "change": "逐相机 p=0.2 删除对应证据",
+      "question": "正常精度与缺相机能力的取舍",
+      "optimizer_updates": 9371,
+      "delta_vs_trained_control_pp": -0.16,
+      "status": "completed",
+      "evidence_source": "stage1_report_receipt"
+    },
+    {
+      "method": "center_select",
+      "miou_pct": 82.46,
+      "change": "图像中心质量代理 top-1",
+      "question": "固定质量选择是否优于原选择/均值",
+      "optimizer_updates": null,
+      "delta_vs_trained_control_pp": 0.26,
+      "status": "completed",
+      "evidence_source": "campaign_report_receipt"
+    },
+    {
+      "method": "center_weighted",
+      "miou_pct": 82.42,
+      "change": "中心质量代理加权",
+      "question": "固定质量加权是否优于等权均值",
+      "optimizer_updates": null,
+      "delta_vs_trained_control_pp": 0.22,
+      "status": "completed",
+      "evidence_source": "campaign_report_receipt"
+    },
+    {
+      "method": "bilinear",
+      "miou_pct": 82.36,
+      "change": "对齐后的双线性取样",
+      "question": "离散 nearest 取样是否限制融合",
+      "optimizer_updates": null,
+      "delta_vs_trained_control_pp": 0.16,
+      "status": "completed",
+      "evidence_source": "campaign_report_receipt"
+    },
+    {
+      "method": "local_average",
+      "miou_pct": 81.86,
+      "change": "3×3 有效图像 token 邻域均值",
+      "question": "无参数局部上下文是否有益",
+      "optimizer_updates": null,
+      "delta_vs_trained_control_pp": -0.34,
+      "status": "completed",
+      "evidence_source": "campaign_report_receipt"
+    },
+    {
+      "method": "local_attention",
+      "miou_pct": 82.21,
+      "change": "xyz/strength 查询的3×3局部注意力",
+      "question": "学习局部对应是否优于原取样/局部均值",
+      "optimizer_updates": null,
+      "delta_vs_trained_control_pp": 0.01,
+      "status": "completed",
+      "evidence_source": "campaign_report_receipt"
+    },
+    {
+      "method": "valid_mask",
+      "miou_pct": 82.06,
+      "change": "投影后无观测点零注入",
+      "question": "无对应图像支路的偏置是否影响结果",
+      "optimizer_updates": null,
+      "delta_vs_trained_control_pp": -0.14,
+      "status": "completed",
+      "evidence_source": "campaign_report_receipt"
+    },
+    {
+      "method": "valid_pool",
+      "miou_pct": null,
+      "change": "图像池化排除无效项",
+      "question": "无效零值是否压过有效负特征",
+      "optimizer_updates": null,
+      "delta_vs_trained_control_pp": null,
+      "status": "failed_training",
+      "evidence_source": "campaign_report_receipt"
+    },
+    {
+      "method": "valid_both",
+      "miou_pct": null,
+      "change": "有效性 mask 与有效池化组合",
+      "question": "两种处理是否需要共同传播",
+      "optimizer_updates": null,
+      "delta_vs_trained_control_pp": null,
+      "status": "failed_training",
+      "evidence_source": "campaign_report_receipt"
+    },
+    {
+      "method": "whole_camera_dropout",
+      "miou_pct": 82.41,
+      "change": "p=0.2 整组六相机证据丢弃",
+      "question": "显式整组缺失训练是否优于逐相机 dropout",
+      "optimizer_updates": null,
+      "delta_vs_trained_control_pp": 0.21,
+      "status": "completed",
+      "evidence_source": "campaign_report_receipt"
+    }
+  ],
+  "missing_camera_results": [
+    {
+      "method": "control",
+      "camera_count": 3,
+      "status": "completed",
+      "miou_pct": 60.79,
+      "macc_pct": null,
+      "oa_pct": null,
+      "source": "campaign_report_receipt",
+      "delta_vs_matched_control_pp": 0
+    },
+    {
+      "method": "control",
+      "camera_count": 1,
+      "status": "completed",
+      "miou_pct": 49.2,
+      "macc_pct": null,
+      "oa_pct": null,
+      "source": "campaign_report_receipt",
+      "delta_vs_matched_control_pp": 0
+    },
+    {
+      "method": "control",
+      "camera_count": 0,
+      "status": "completed",
+      "miou_pct": 36.8,
+      "macc_pct": 44.59,
+      "oa_pct": 85.42,
+      "source": "pasted_final_summary_json",
+      "delta_vs_matched_control_pp": 0
+    },
+    {
+      "method": "camera_dropout",
+      "camera_count": 3,
+      "status": "completed",
+      "miou_pct": 73.13,
+      "macc_pct": 81.12,
+      "oa_pct": 93.68,
+      "source": "pasted_final_summary_json",
+      "delta_vs_matched_control_pp": 12.34
+    },
+    {
+      "method": "camera_dropout",
+      "camera_count": 1,
+      "status": "running_at_last_receipt",
+      "miou_pct": null,
+      "macc_pct": null,
+      "oa_pct": null,
+      "pid": 100312,
+      "gpu": 1,
+      "source": "resume_console_receipt",
+      "delta_vs_matched_control_pp": null
+    },
+    {
+      "method": "camera_dropout",
+      "camera_count": 0,
+      "status": "running_at_last_receipt",
+      "miou_pct": null,
+      "macc_pct": null,
+      "oa_pct": null,
+      "pid": 100432,
+      "gpu": 0,
+      "source": "resume_console_receipt",
+      "delta_vs_matched_control_pp": null
+    },
+    {
+      "method": "whole_camera_dropout",
+      "camera_count": 3,
+      "status": "pending_at_last_full_snapshot",
+      "miou_pct": null,
+      "macc_pct": null,
+      "oa_pct": null,
+      "source": "campaign_report_receipt_before_restart",
+      "delta_vs_matched_control_pp": null
+    },
+    {
+      "method": "whole_camera_dropout",
+      "camera_count": 1,
+      "status": "pending_at_last_full_snapshot",
+      "miou_pct": null,
+      "macc_pct": null,
+      "oa_pct": null,
+      "source": "campaign_report_receipt_before_restart",
+      "delta_vs_matched_control_pp": null
+    },
+    {
+      "method": "whole_camera_dropout",
+      "camera_count": 0,
+      "status": "pending_at_last_full_snapshot",
+      "miou_pct": null,
+      "macc_pct": null,
+      "oa_pct": null,
+      "source": "campaign_report_receipt_before_restart",
+      "delta_vs_matched_control_pp": null
+    }
+  ],
+  "pixel_shift_results": [
+    {
+      "method": "control",
+      "shift_x_pixels": 4,
+      "status": "pending_at_last_full_snapshot",
+      "miou_pct": null
+    },
+    {
+      "method": "bilinear",
+      "shift_x_pixels": 4,
+      "status": "pending_at_last_full_snapshot",
+      "miou_pct": null
+    },
+    {
+      "method": "local_attention",
+      "shift_x_pixels": 4,
+      "status": "pending_at_last_full_snapshot",
+      "miou_pct": null
+    }
+  ],
+  "medium_results": [
+    {
+      "method": "control",
+      "epochs": 10,
+      "status": "pending_at_last_full_snapshot",
+      "miou_pct": null
+    },
+    {
+      "method": "gate",
+      "epochs": 10,
+      "status": "pending_at_last_full_snapshot",
+      "miou_pct": null
+    },
+    {
+      "method": "center_select",
+      "epochs": 10,
+      "status": "pending_at_last_full_snapshot",
+      "miou_pct": null
+    },
+    {
+      "method": "local_attention",
+      "epochs": 10,
+      "status": "pending_at_last_full_snapshot",
+      "miou_pct": null
+    },
+    {
+      "method": "valid_both",
+      "epochs": 10,
+      "status": "blocked",
+      "miou_pct": null
+    },
+    {
+      "method": "whole_camera_dropout",
+      "epochs": 10,
+      "status": "pending_at_last_full_snapshot",
+      "miou_pct": null
+    }
+  ],
+  "failures": [
+    {
+      "job": "screen_valid_pool_train",
+      "error": "Non-finite first training loss",
+      "first_successful_update_completed": false,
+      "root_cause": "not yet identified"
+    },
+    {
+      "job": "screen_valid_both_train",
+      "error": "Non-finite first training loss",
+      "first_successful_update_completed": false,
+      "root_cause": "not yet identified"
+    }
+  ],
+  "blocked_jobs": [
+    "screen_valid_pool_clean",
+    "screen_valid_both_clean",
+    "medium_valid_both_train",
+    "medium_valid_both_clean"
+  ],
+  "comparison": {
+    "three_camera_dropout_advantage_pp": 12.34,
+    "clean_camera_dropout_delta_pp": -0.16,
+    "control_clean_to_three_camera_drop_pp": 21.41,
+    "camera_dropout_clean_to_three_camera_drop_pp": 8.91,
+    "reduction_in_clean_to_three_camera_drop_pp": 12.5
+  },
+  "limitations": [
+    "single reported training seed",
+    "fixed camera subsets, not averages across all subsets",
+    "4px shift is not SE(3) extrinsic perturbation",
+    "zero image evidence is not a separately trained LiDAR-only baseline",
+    "actual run snapshot commit and full artifacts not received",
+    "latest running/pending states are time-bounded receipts, not live monitoring"
+  ]
+}

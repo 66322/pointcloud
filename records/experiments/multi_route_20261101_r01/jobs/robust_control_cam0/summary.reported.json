@@ -1,0 +1,88 @@
+{
+  "miou_pct": 36.8,
+  "macc_pct": 44.59,
+  "oa_pct": 85.42,
+  "per_class": {
+    "barrier": {
+      "id": 0,
+      "iou_pct": 0.06,
+      "accuracy_pct": 0.06
+    },
+    "bicycle": {
+      "id": 1,
+      "iou_pct": 9.54,
+      "accuracy_pct": 10.32
+    },
+    "bus": {
+      "id": 2,
+      "iou_pct": 0.06,
+      "accuracy_pct": 0.06
+    },
+    "car": {
+      "id": 3,
+      "iou_pct": 70.69,
+      "accuracy_pct": 90.19
+    },
+    "construction_vehicle": {
+      "id": 4,
+      "iou_pct": 0,
+      "accuracy_pct": 0
+    },
+    "motorcycle": {
+      "id": 5,
+      "iou_pct": 10.51,
+      "accuracy_pct": 10.61
+    },
+    "pedestrian": {
+      "id": 6,
+      "iou_pct": 64.91,
+      "accuracy_pct": 69.59
+    },
+    "traffic_cone": {
+      "id": 7,
+      "iou_pct": 39.89,
+      "accuracy_pct": 56.07
+    },
+    "trailer": {
+      "id": 8,
+      "iou_pct": 0.01,
+      "accuracy_pct": 0.01
+    },
+    "truck": {
+      "id": 9,
+      "iou_pct": 6.59,
+      "accuracy_pct": 7.140000000000001
+    },
+    "driveable_surface": {
+      "id": 10,
+      "iou_pct": 93.89999999999999,
+      "accuracy_pct": 98.26
+    },
+    "other_flat": {
+      "id": 11,
+      "iou_pct": 39.72,
+      "accuracy_pct": 61.970000000000006
+    },
+    "sidewalk": {
+      "id": 12,
+      "iou_pct": 34.12,
+      "accuracy_pct": 35.27
+    },
+    "terrain": {
+      "id": 13,
+      "iou_pct": 59.760000000000005,
+      "accuracy_pct": 91.38
+    },
+    "manmade": {
+      "id": 14,
+      "iou_pct": 76.82,
+      "accuracy_pct": 92.81
+    },
+    "vegetation": {
+      "id": 15,
+      "iou_pct": 82.19999999999999,
+      "accuracy_pct": 89.67
+    }
+  },
+  "source": "upstream SemSegTester final test.log metrics"
+}

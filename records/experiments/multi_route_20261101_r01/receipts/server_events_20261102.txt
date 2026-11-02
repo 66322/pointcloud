@@ -1,0 +1,24 @@
+Evidence: selected exact user-pasted server output. All displayed log times are Asia/Shanghai. No direct server access by assistant.
+
+[2026-11-02 07:31:28,135 INFO train.py line 176 115923] TRAIN valid_pool: 28130 frames/epoch; 2 epochs; batch=6; total=9376 steps; GPU=0
+RuntimeError: Non-finite first training loss
+[2026-11-02 07:33:26,887 INFO train.py line 176 117349] TRAIN valid_both: 28130 frames/epoch; 2 epochs; batch=6; total=9376 steps; GPU=0
+RuntimeError: Non-finite first training loss
+
+任务节点状态： {'reused': 8, 'completed': 16, 'failed': 2, 'blocked': 4, 'running': 2, 'pending': 18}
+This count belongs to the 10:24:42 receipt, not the latest time.
+
+已重新排队： robust_control_cam0
+已重新排队： robust_camera_dropout_cam3
+恢复准备完成。
+Resume controller PID: 59334
+
+REUSE 8 completed jobs; completed same-budget prior artifacts
+START robust_control_cam0: GPU 0, PID 59338, log=/home/jovyan/zzx/pointcloud/runs/multi_route_20261101_r01/logs/robust_control_cam0.log
+START robust_camera_dropout_cam3: GPU 1, PID 59343, log=/home/jovyan/zzx/pointcloud/runs/multi_route_20261101_r01/logs/robust_camera_dropout_cam3.log
+[2026-11-02 14:15:03,374 INFO test.py line 361 59343] <<<<<<<<<<<<<<<<< End Evaluation <<<<<<<<<<<<<<<<<
+[2026-11-02 14:15:23,358 INFO test.py line 361 59338] <<<<<<<<<<<<<<<<< End Evaluation <<<<<<<<<<<<<<<<<
+DONE robust_camera_dropout_cam3: /home/jovyan/zzx/pointcloud/runs/multi_route_20261101_r01/jobs/robust_camera_dropout_cam3
+START robust_camera_dropout_cam1: GPU 1, PID 100312, log=/home/jovyan/zzx/pointcloud/runs/multi_route_20261101_r01/logs/robust_camera_dropout_cam1.log
+DONE robust_control_cam0: /home/jovyan/zzx/pointcloud/runs/multi_route_20261101_r01/jobs/robust_control_cam0
+START robust_camera_dropout_cam0: GPU 0, PID 100432, log=/home/jovyan/zzx/pointcloud/runs/multi_route_20261101_r01/logs/robust_camera_dropout_cam0.log

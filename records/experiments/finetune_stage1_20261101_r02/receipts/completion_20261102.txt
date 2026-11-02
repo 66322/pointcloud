@@ -1,0 +1,19 @@
+Evidence: user pasted server terminal output on 2026-11-02. Selected small exact lines; not a complete server export.
+
+{
+  "status": "completed",
+  "ended_at": "2026-11-01T16:50:19.435656+00:00"
+}
+
+# Same-budget training experiments
+| Method | mIoU % | Delta vs trained control pp | Optimizer updates |
+|---|---:|---:|---:|
+| control | 82.20 | 0.0 | 9371 |
+| gate | 82.21 | 0.01 | 9372 |
+| camera_dropout | 82.04 | -0.16 | 9371 |
+| mean | 82.47 | 0.27 | 9371 |
+
+[2026-11-01 22:01:17,810 INFO train.py line 251 3975987] Train control: [9376/9376] loss=0.28673 wall/step=0.467s wait/step=0.003s ETA=0.0min
+[2026-11-01 22:01:43,634 INFO train.py line 251 3975988] Train gate: [9376/9376] loss=0.28685 wall/step=0.470s wait/step=0.001s ETA=0.0min
+[2026-11-02 00:03:44,947 INFO train.py line 251 4038748] Train mean: [9376/9376] loss=0.28732 wall/step=0.480s wait/step=0.002s ETA=0.0min
+[2026-11-02 00:03:45,663 INFO train.py line 251 4039002] Train camera_dropout: [9376/9376] loss=0.42132 wall/step=0.477s wait/step=0.003s ETA=0.0min

@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "run_id": "finetune_stage1_20261101_r02",
+  "evidence": {
+    "source_type": "user_pasted_server_receipt",
+    "archive_date": "2026-11-02",
+    "timezone": "Asia/Shanghai",
+    "independently_read_from_server": false,
+    "independent_rerun": false,
+    "actual_server_snapshot_commit": null,
+    "missing_values_are": "not received; never fill from another method or condition"
+  },
+  "reported_run_status": "completed",
+  "reported_end_at": "2026-11-02T00:50:19.435656+08:00",
+  "reported_source_commit_prefix_from_first_update_receipt": "81ec641",
+  "protocol": {
+    "dataset": "nuScenes lidarseg",
+    "num_classes": 16,
+    "train_index_frames": 28130,
+    "val_frames": 6019,
+    "epochs": 2,
+    "batch_size_per_model": 6,
+    "steps_per_epoch": 4688,
+    "planned_iterations": 9376,
+    "seed": 20261101,
+    "max_lr": 0.0002,
+    "block_lr_ratio": 0.1,
+    "teacher": "DINOv2-L frozen/eval",
+    "checkpoint_selection": "final epoch only",
+    "validation": "upstream SemSegTester full val with original TTA",
+    "protocol_source": "checked-in configs and user terminal receipts; complete effective server artifacts not received"
+  },
+  "results": [
+    {
+      "method": "control",
+      "miou_pct": 82.2,
+      "change": "原赋值/加法继续训练",
+      "question": "分离额外训练预算本身的影响",
+      "optimizer_updates": 9371,
+      "delta_vs_trained_control_pp": 0,
+      "status": "completed",
+      "evidence_source": "stage1_report_receipt",
+      "planned_iterations_completed": 9376,
+      "amp_skipped_steps_inferred": 5,
+      "macc_pct": null,
+      "oa_pct": null
+    },
+    {
+      "method": "gate",
+      "miou_pct": 82.21,
+      "change": "四级图像注入的恒等初始化门控",
+      "question": "学习注入强度是否优于原加法",
+      "optimizer_updates": 9372,
+      "delta_vs_trained_control_pp": 0.01,
+      "status": "completed",
+      "evidence_source": "stage1_report_receipt",
+      "planned_iterations_completed": 9376,
+      "amp_skipped_steps_inferred": 4,
+      "macc_pct": null,
+      "oa_pct": null
+    },
+    {
+      "method": "mean",
+      "miou_pct": 82.47,
+      "change": "有效多视图特征均值",
+      "question": "重新训练适配均值后是否有收益",
+      "optimizer_updates": 9371,
+      "delta_vs_trained_control_pp": 0.27,
+      "status": "completed",
+      "evidence_source": "stage1_report_receipt",
+      "planned_iterations_completed": 9376,
+      "amp_skipped_steps_inferred": 5,
+      "macc_pct": null,
+      "oa_pct": null
+    },
+    {
+      "method": "camera_dropout",
+      "miou_pct": 82.04,
+      "change": "逐相机 p=0.2 删除对应证据",
+      "question": "正常精度与缺相机能力的取舍",
+      "optimizer_updates": 9371,
+      "delta_vs_trained_control_pp": -0.16,
+      "status": "completed",
+      "evidence_source": "stage1_report_receipt",
+      "planned_iterations_completed": 9376,
+      "amp_skipped_steps_inferred": 5,
+      "macc_pct": null,
+      "oa_pct": null
+    }
+  ],
+  "missing_artifacts": [
+    "full per-class summaries",
+    "effective protocol/config snapshots",
+    "full training summaries and runtime"
+  ]
+}

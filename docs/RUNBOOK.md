@@ -1,7 +1,9 @@
 # 当前实验执行手册（精简流程）
 
-**2026-11-01新增：[无人值守多路线接续](CAMPAIGN_RUNBOOK.md)。**
-旧训练r02继续运行，现在即可启动接续队列等待它结束；不需要等显卡空闲后再回来。
+**2026-11-02最新：[交接记录](HANDOFF.md) · [实验总表](EXPERIMENT_MASTER.md)。**
+推理r02和四组微调r02均已完成；多路线r01重启恢复后已继续运行。
+最近确认GPU0进行dropout零相机、GPU1进行dropout单相机评价，具体实时状态看服务器日志。
+下面原推理命令仅作历史操作说明，不重复启动已有批次。
 
 按用户2026-11-01要求：接受已有82.48%完整val基线；新入口只跑通一帧，随后直接正式实验。
 不再重复preflight、20/100帧试验、全量旧缓存统计或文件/权重哈希扫描。
@@ -9,7 +11,7 @@
 ## 当前r02已完成
 
 最终回执确认completed：mean82.64%、first82.55%，结束于北京时间2026-11-01 19:38:55。
-接下来使用[训练入口](TRAINING_RUNBOOK.md)，不要重跑r02或再启动同样的r03。
+四组[微调r02](TRAINING_RUNBOOK.md)也已完成，后续由现有[多路线队列](CAMPAIGN_RUNBOOK.md)接续。
 以下前台作业控制仅保留作历史说明，不适用于已经结束的r02。
 
 本轮是前台启动。如果需要转后台，在原终端按Ctrl+Z，看到Stopped后执行：
@@ -30,7 +32,7 @@ jobs -l %+
 
 ~~~bash
 cd /home/jovyan/zzx/pointcloud
-git pull --rebase
+git pull --ff-only
 conda activate pointcept-torch2.5.0-cu12.4
 bash scripts/start_view_experiments.sh view_assignment_fullval_20261101_r03
 ~~~
@@ -68,7 +70,7 @@ bash scripts/start_view_experiments.sh view_assignment_manual_options \
 
 ~~~bash
 cd /home/jovyan/zzx/pointcloud
-git pull --rebase
+git pull --ff-only
 conda activate pointcept-torch2.5.0-cu12.4
 python -m pointcloud_lab.evaluate \
   --paths configs/paths.local.json \
@@ -121,11 +123,11 @@ r01因timm额外读取DINO预训练缓存失败，已修复。现在构建结构
 ~~~bash
 python -m pointcloud_lab.export_record \
   --run runs/view_assignment_fullval_20261101_r02 \
-  --record records/experiments/view_assignment_fullval_20261101_r02
+  --record records/experiments/view_assignment_fullval_20261101_r02/server_export_20261102
 
 git add records/experiments/view_assignment_fullval_20261101_r02
 git commit -m "Record full-val view assignment experiments"
-git pull --rebase
+git pull --ff-only
 git -c credential.helper= push origin main
 ~~~
 

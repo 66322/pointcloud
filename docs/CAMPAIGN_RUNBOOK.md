@@ -1,9 +1,13 @@
 # 无人值守多路线接续队列
 
-2026-11-01：代码已交付，服务器待用户执行下面的一次启动。
-不修改、不重启finetune_stage1_20261101_r02，也不重复已有82.48%基线推理。
+2026-11-02更新：multi_route_20261101_r01已在服务器执行，旧四组r02已完成并复用8个节点。
+最近带时间的完成事件为14:15:23，随后GPU0启动dropout零相机、GPU1启动dropout单相机评价。
+两轮clean已有11组结果，valid_pool/both训练失败；具体结果见[总表](EXPERIMENT_MASTER.md)和[交接记录](HANDOFF.md)。
 
-## 现在执行一次
+机器重启后的两项验证已经重新排队、完成并接续；保持当前队列，不重复执行下面的首次启动命令。
+[重启记录与恢复边界](../records/analyses/campaign_restart_20261102.md)
+
+## 首次启动历史（当前r01已启动）
 
 ~~~bash
 cd /home/jovyan/zzx/pointcloud
@@ -20,7 +24,7 @@ bash scripts/start_campaign.sh multi_route_20261101_r01 \
 旧队列若正常写出failed，也会继续：只复用已完成结果，补跑缺失的短训/评价。
 旧队列若被强制kill而状态一直停在running，接续器会保守等待，不能假装旧任务已退出。
 
-## 实际数量
+## 固定计划数量（不是完成数）
 
 固定计划：[multi_route_queue.json](../configs/training/multi_route_queue.json)。
 共50个任务节点，其中旧四组正常完成时复用8个节点，实际新增：
@@ -95,7 +99,8 @@ valid_mask在投影后的mask不等于有效样本专用BatchNorm；无效输入
 /home/jovyan/zzx/pointcloud/
   runs/_launch/multi_route_20261101_r01/
     pid
-    console.log                         # 等待、启动、完成、失败事件
+    console.log                         # 首次控制器事件
+    resume_console.log                  # 当前恢复控制器事件
   runs/multi_route_20261101_r01/
     plan.json                           # 固定任务定义
     screen_protocol.json
@@ -129,11 +134,11 @@ valid_mask在投影后的mask不等于有效样本专用BatchNorm；无效输入
 ~~~bash
 cd /home/jovyan/zzx/pointcloud
 cat runs/multi_route_20261101_r01/status.json
-tail -n 15 runs/_launch/multi_route_20261101_r01/console.log
+tail -n 15 runs/_launch/multi_route_20261101_r01/resume_console.log
 cat runs/multi_route_20261101_r01/report.md
 ~~~
 
-控制器意外退出时，只对同一个批次执行：
+仅控制器退出而子进程仍存活时，可对同一批次执行以下入口。整机重启导致子进程消失时，原入口会把未完成项判为failed，必须先按[恢复记录](../records/analyses/campaign_restart_20261102.md)核对、保留输出并明确重排，不能直接承诺逐帧续算：
 
 ~~~bash
 bash scripts/resume_campaign.sh multi_route_20261101_r01
@@ -145,6 +150,8 @@ bash scripts/resume_campaign.sh multi_route_20261101_r01
 
 ## 完成后同步轻量结果
 
+当前回执已在records/experiments同名目录归档。后续完整导出使用该目录内全新的server_export_日期时间子目录，保留回执。当前批次未结束不能整批export；此外须先处理jobs下.interrupted_归档目录被导出器扫描的边界，见恢复记录。下面命令仅供完成并处理该边界后使用。
+
 终态completed或completed_with_failures都可导出；后者包含失败/依赖阻断记录。
 训练/评价细节已经自动记录在runs，不需要逐个手工抄结果。
 结束后一次导出、提交即可；队列不代替用户保存GitHub凭据。
@@ -152,10 +159,10 @@ bash scripts/resume_campaign.sh multi_route_20261101_r01
 ~~~bash
 python -m pointcloud_lab.export_record \
   --run runs/multi_route_20261101_r01 \
-  --record records/experiments/multi_route_20261101_r01
+  --record records/experiments/multi_route_20261101_r01/server_export_20261102
 git add records/experiments/multi_route_20261101_r01
 git commit -m "Record multi-route DITR campaign"
-git pull --rebase
+git pull --ff-only
 git -c credential.helper= push origin main
 ~~~
 
