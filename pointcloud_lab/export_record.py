@@ -58,7 +58,15 @@ def export(source, target):
             export(child, target / name)
     jobs = source / "jobs"
     if jobs.is_dir():
-        for child in sorted(jobs.iterdir()):
+        if queue.is_file():
+            # Export only directories currently referenced by this queue.
+            # Interrupted archives remain untouched beside the live outputs.
+            children = {Path(job.get("output", jobs / job["id"])).resolve()
+                        for job in read_json(queue)["jobs"] if job["status"] != "reused"}
+            children = sorted(child for child in children if child.parent == jobs.resolve())
+        else:
+            children = sorted(jobs.iterdir())
+        for child in children:
             if child.is_dir() and not child.is_symlink() and (child / "status.json").is_file():
                 export(child, target / "jobs" / child.name)
 

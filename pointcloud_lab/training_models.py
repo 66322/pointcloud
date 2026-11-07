@@ -49,7 +49,7 @@ def freeze_dino(backbone):
 class AssignmentPolicy:
     def __init__(self, backbone, original, method, protocol):
         self.backbone, self.original, self.method = backbone, original, method
-        self.probability = protocol["camera_dropout"]
+        self.probability = .5 if method == "camera_dropout_half" else protocol["camera_dropout"]
         self.generator = torch.Generator(device="cpu").manual_seed(protocol["seed"] + 73)
         self.calls = self.dropped = 0
 
@@ -63,10 +63,16 @@ class AssignmentPolicy:
             return self.original(data, local_average(features), patch, missing)
         if self.method == "mean":
             return assign_variant(data, features, patch, missing, mode="mean")
-        if self.method not in {"camera_dropout", "whole_camera_dropout"} or not self.backbone.training:
+        if self.method not in {"camera_dropout", "whole_camera_dropout",
+                               "camera_dropout_half", "uniform_camera_dropout"} or not self.backbone.training:
             return self.original(data, features, patch, missing)
         shape = (features.shape[0], 1) if self.method == "whole_camera_dropout" else features.shape[:2]
-        keep = (torch.rand(shape, generator=self.generator) >= self.probability).expand(features.shape[:2])
+        if self.method == "uniform_camera_dropout":
+            counts = torch.randint(0, features.shape[1] + 1, (features.shape[0], 1), generator=self.generator)
+            ranks = torch.rand(features.shape[:2], generator=self.generator).argsort(dim=1).argsort(dim=1)
+            keep = ranks < counts
+        else:
+            keep = (torch.rand(shape, generator=self.generator) >= self.probability).expand(features.shape[:2])
         self.calls += 1
         self.dropped += int((~keep).sum())
         offsets = data.get("unmix3d_offset", data["offset"]).long()

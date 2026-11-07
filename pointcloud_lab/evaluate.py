@@ -145,6 +145,8 @@ def main():
             def build_test_loader(self):
                 dataset = build_dataset(cfg.data.test)
                 dataset.data_list = select_infos(dataset.data_list, tokens=tokens)
+                from .raw_cache import attach_raw_cache
+                attach_raw_cache(dataset, paths.get("decoded_val_cache"))
                 raw_reader = None
                 if args.io_workers:
                     if type(dataset).__name__ != "NuScenesDataset":

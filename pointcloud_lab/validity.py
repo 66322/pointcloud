@@ -8,7 +8,9 @@ def validity_pool_forward(self, point):
     if self.lab_mask_pool:
         if self.reduce != "max":
             raise ValueError("Validity pooling adapter expects upstream max pooling")
-        point.image_feat = saved.masked_fill(~valid[:, None], -torch.inf)
+        # Keep the CUDA reduction input finite, including entirely unobserved
+        # clusters. Their output is explicitly zeroed after support propagation.
+        point.image_feat = saved.masked_fill(~valid[:, None], torch.finfo(saved.dtype).min)
     try:
         result = self.lab_original_forward(point)
     finally:

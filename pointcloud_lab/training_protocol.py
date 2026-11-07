@@ -3,19 +3,21 @@
 METHODS = ("control", "gate", "mean", "camera_dropout",
            "center_select", "center_weighted", "bilinear", "local_average",
            "local_attention", "valid_mask", "valid_pool", "valid_both",
-           "whole_camera_dropout")
+           "whole_camera_dropout", "camera_dropout_half", "uniform_camera_dropout")
 
 
 def validate_protocol(protocol):
     fields = {"id", "epochs", "batch_size", "workers", "prefetch_factor", "seed",
               "max_lr", "block_lr_ratio", "gate_hidden", "camera_dropout", "methods"}
-    if set(protocol) != fields:
+    if not fields.issubset(protocol) or set(protocol) - fields - {"profile_steps"}:
         raise ValueError(f"Training protocol keys must be {sorted(fields)}")
     for key in ("epochs", "batch_size", "prefetch_factor", "gate_hidden"):
         if not isinstance(protocol[key], int) or protocol[key] < 1:
             raise ValueError(f"{key} must be a positive integer")
     if not isinstance(protocol["workers"], int) or protocol["workers"] < 0:
         raise ValueError("workers must be a nonnegative integer")
+    if not isinstance(protocol.get("profile_steps", 0), int) or protocol.get("profile_steps", 0) < 0:
+        raise ValueError("profile_steps must be a nonnegative integer")
     if not 0 < protocol["max_lr"] or not 0 < protocol["block_lr_ratio"] <= 1:
         raise ValueError("Positive learning rates required")
     if not 0 < protocol["camera_dropout"] < 1:

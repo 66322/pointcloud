@@ -95,8 +95,65 @@ def dependency_state(job, by_id):
 
 
 def same_budget(left, right):
-    return ({k: v for k, v in left.items() if k not in {"id", "methods"}}
-            == {k: v for k, v in right.items() if k not in {"id", "methods"}})
+    execution = {"id", "methods", "workers", "prefetch_factor", "profile_steps"}
+    return ({k: v for k, v in left.items() if k not in execution}
+            == {k: v for k, v in right.items() if k not in execution})
+
+
+def reuse_campaign_results(jobs, prior, protocol, paths, tokens):
+    """Reuse matching completed nodes from a prior campaign, including its 10ep nodes.
+
+    These existing treatments have unchanged model semantics in resource stage 1.
+    New/repaired model methods are deliberately absent from this reuse allowlist.
+    """
+    previous = optional_json(prior / "queue.json")
+    old_paths = optional_json(prior / "paths.json")
+    cache_keys = {"decoded_train_cache", "decoded_val_cache"}
+    current_paths = {k: v for k, v in paths.items() if k not in cache_keys}
+    original_paths = {k: v for k, v in (old_paths or {}).items() if k not in cache_keys}
+    if not previous or not old_paths or original_paths != current_paths:
+        return []
+    if optional_json(prior / "tokens.json") != tokens:
+        return []
+    allowed = {"control", "camera_dropout", "whole_camera_dropout", "bilinear"}
+    by_id = {job["id"]: job for job in jobs}
+    old_by_id = {job["id"]: job for job in previous["jobs"]}
+    reused = []
+    for job in jobs:
+        if job["status"] != "pending" or job["phase"] != "screen" or job["method"] not in allowed:
+            continue
+        for old in previous["jobs"]:
+            if old["status"] not in DONE or (old["kind"], old["method"]) != (job["kind"], job["method"]):
+                continue
+            source = Path(old.get("source", old["output"]))
+            training = source if job["kind"] == "train" else Path(
+                old_by_id[old["train_job"]].get("source", old_by_id[old["train_job"]]["output"]))
+            saved = optional_json(training / "experiment.json")
+            if not saved or saved["method"] != job["method"] or not same_budget(saved["protocol"], protocol):
+                continue
+            state, summary = optional_json(source / "status.json"), optional_json(source / "summary.json")
+            if not state or state["status"] != "completed" or summary is None:
+                continue
+            if not (training / "model/model_last.pth").is_file():
+                continue
+            if job["kind"] == "eval":
+                if not {"miou_pct", "macc_pct", "oa_pct"}.issubset(summary):
+                    continue
+                selected = by_id[job["train_job"]]
+                if selected["status"] != "reused" or Path(selected["output"]).resolve() != training.resolve():
+                    continue
+                provenance = optional_json(source / "provenance.json")
+                if (not provenance or provenance.get("tokens") != tokens
+                        or provenance.get("experiment", {}).get("assignment", "official") != "official"
+                        or provenance.get("evaluation_condition") != condition_description(6, 0)):
+                    continue
+                if old.get("camera_count") != 6 or old.get("shift_x") != 0:
+                    continue
+            job.update(status="reused", reused_from=str(source), output=str(source), summary=summary,
+                       reuse_reason="completed prior campaign; matched method, budget, dataset and evaluation")
+            reused.append(job["id"])
+            break
+    return reused
 
 
 def reuse_prior(jobs, prior, protocol, paths, tokens):
@@ -413,6 +470,9 @@ def main():
             write_json(tokens_file, tokens)
         if prior:
             reuse = reuse_prior(jobs, prior, plan["screen_protocol"], paths, tokens)
+            inherited = reuse_campaign_results(jobs, prior, plan["screen_protocol"], paths, tokens)
+            reuse["reused"] = sorted(set(reuse["reused"] + inherited))
+            reuse["campaign_reused"] = inherited
             atomic_json(output / "queue.json", {"jobs": jobs, "updated_at": timestamp()})
             atomic_json(output / "reuse.json", reuse)
             print(f"REUSE {len(reuse['reused'])} completed jobs; {reuse['reason']}", flush=True)

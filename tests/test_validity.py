@@ -57,6 +57,23 @@ def upstream_classes():
 
 @unittest.skipUnless(HAS_TORCH and SOURCE.is_file(), "Needs Torch and cached pinned upstream source")
 class ValidityTests(unittest.TestCase):
+    def test_masked_pool_reduction_receives_only_finite_values_in_training(self):
+        import torch
+        from unittest.mock import patch
+        self.install("valid_pool")
+        self.model.train()
+        original = self.api["torch_scatter"].segment_csr
+        inputs = []
+        def finite_csr(source, pointer, reduce):
+            inputs.append(source)
+            self.assertTrue(torch.isfinite(source).all())
+            return original(source, pointer, reduce)
+        with patch.object(self.api["torch_scatter"], "segment_csr", side_effect=finite_csr):
+            result = self.model.backbone.pools[0](self.inputs())
+        self.assertTrue(inputs)
+        self.assertTrue(torch.isfinite(result.image_feat).all())
+        self.assertTrue(torch.equal(result.image_feat[1], torch.zeros(2)))
+
     def setUp(self):
         import torch
         from torch import nn

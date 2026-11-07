@@ -31,6 +31,7 @@ def main():
     else:
         write_json(output / "experiment.json", {"method": args.method, "protocol": protocol})
     write_json(output / "status.json", {"status": "running", "started_at": timestamp()})
+    print(f"BOOT {timestamp()}: method={args.method}, GPU={args.gpu}, output={output}", flush=True)
     try:
         os.environ.setdefault("HF_HOME", paths["hf_cache"])
         os.environ.setdefault("HF_HUB_OFFLINE", "1")
@@ -72,6 +73,11 @@ def main():
 
         # This is the actual training load, not a separate scan or preflight.
         dataset = build_dataset(cfg.data.train)
+        from .raw_cache import attach_raw_cache
+        attach_raw_cache(dataset, paths.get("decoded_train_cache"))
+        logger.info("Dataset ready: frames=%d workers=%d prefetch=%d decoded_cache=%s",
+                    len(dataset), protocol["workers"], protocol["prefetch_factor"],
+                    paths.get("decoded_train_cache"))
         if not len(dataset):
             raise ValueError("Training split is empty")
         context = mp.get_context("spawn")
@@ -95,11 +101,13 @@ def main():
 
         image_module = importlib.import_module(
             "pointcept.models.point_transformer_v3.point_transformer_v3m1_image")
+        logger.info("Building model structure with checkpoint-only DINO initialization")
         with checkpoint_only_dino_init(timm):
             model = build_model(cfg.model)
         if cfg.sync_bn:
             model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
         if not args.resume:
+            logger.info("Loading initial checkpoint strictly")
             load_full_state(model, paths["weight"])
         policy = install_treatment(model, image_module, args.method, protocol)
         resume_checkpoint = load_full_state(model, output / "model/model_last.pth") if args.resume else None
@@ -149,6 +157,13 @@ def main():
                 "point_chunk": 2048, "training_value_memory": "non-reentrant activation checkpointing",
             } if args.method == "local_attention" else None),
             "loader_transport": "numpy pipe; main-process pinning; no shared tensor storage",
+            "decoded_raw_cache": paths.get("decoded_train_cache"),
+            "empty_cache_per_step": bool(cfg.empty_cache),
+            "profile_definition": "CUDA stream intervals during attempted iterations 21 onward in this invocation",
+            "camera_dropout_effective_probability": (
+                policy.probability if args.method in {
+                    "camera_dropout", "camera_dropout_half", "whole_camera_dropout"} else None),
+            "uniform_camera_keep_count": args.method == "uniform_camera_dropout",
             "augmentation_seed": "sample_seed(seed, epoch, row); model CPU/CUDA RNG isolated",
             "evaluation": "final checkpoint only, original full validation TTA, separate process",
         })
@@ -172,6 +187,8 @@ def main():
         checked = (output / "first_step.json").is_file() if args.resume else False
         started = time.perf_counter()
         resumed_attempts, wait_seconds = attempts, 0.0
+        last_log_time, last_log_step, last_log_wait = started, attempts, 0.0
+        profile_events, profile_h2d_ms, profile_model_ms, profiled_steps = [], 0.0, 0.0, 0
         torch.cuda.reset_peak_memory_stats()
         logger.info("TRAIN %s: %d frames/epoch; %d epochs; batch=%d; total=%d steps; GPU=%s",
                     args.method, len(dataset), protocol["epochs"], protocol["batch_size"], total_attempts, args.gpu)
@@ -187,20 +204,26 @@ def main():
                     wait_seconds += time.perf_counter() - waiting
                     if epoch == start_epoch and batch_index < next_batch:
                         continue
+                    profiling = 20 <= attempts - resumed_attempts < 20 + protocol.get("profile_steps", 0)
+                    if profiling:
+                        events = [torch.cuda.Event(enable_timing=True) for _ in range(3)]
+                        events[0].record()
                     for key, value in batch.items():
                         if isinstance(value, torch.Tensor):
                             batch[key] = value.cuda(non_blocking=True)
+                    if profiling:
+                        events[1].record()
                     optimizer.zero_grad()
                     with torch.autocast("cuda", enabled=cfg.enable_amp):
                         loss = model(batch)["loss"]
+                    if not checked and not torch.isfinite(loss.detach()):
+                        raise RuntimeError("Non-finite first training loss")
                     if scaler:
                         scaler.scale(loss).backward()
                         scaler.unscale_(optimizer)
                     else:
                         loss.backward()
                     if not checked:
-                        if not torch.isfinite(loss.detach()):
-                            raise RuntimeError("Non-finite first training loss")
                         dino = model.backbone.img_enc
                         if dino.training or any(p.requires_grad or p.grad is not None for p in dino.parameters()):
                             raise RuntimeError("Frozen DINO state/gradient check failed")
@@ -212,7 +235,8 @@ def main():
                             raise RuntimeError("Gate is not connected to loss")
                         if args.method == "local_attention" and model.backbone.lab_local.alpha.grad is None:
                             raise RuntimeError("Local attention is not connected to loss")
-                        if args.method in {"camera_dropout", "whole_camera_dropout"} and not policy.calls:
+                        if args.method in {"camera_dropout", "whole_camera_dropout",
+                                           "camera_dropout_half", "uniform_camera_dropout"} and not policy.calls:
                             raise RuntimeError("Camera dropout policy was not called")
                     else:
                         finite = True
@@ -232,6 +256,9 @@ def main():
                         scheduler.step()
                         updates += 1
                     attempts += 1
+                    if profiling:
+                        events[2].record()
+                        profile_events.append(events)
                     if not checked and successful:
                         if not finite:
                             raise RuntimeError("First successful step has non-finite gradients")
@@ -250,16 +277,33 @@ def main():
                         torch.cuda.empty_cache()
                     if attempts == 1 or attempts % 20 == 0 or attempts == total_attempts:
                         torch.cuda.synchronize()
+                        for begin, transferred, finished in profile_events:
+                            profile_h2d_ms += begin.elapsed_time(transferred)
+                            profile_model_ms += transferred.elapsed_time(finished)
+                            profiled_steps += 1
+                        profile_events.clear()
                         elapsed = time.perf_counter() - started
                         rate = elapsed / max(1, attempts - resumed_attempts)
+                        now = time.perf_counter()
+                        window_steps = max(1, attempts - last_log_step)
                         row = {"epoch": epoch + 1, "step": attempts, "updates": updates,
                                "loss": float(loss.detach()), "wall_seconds": elapsed,
                                "data_wait_seconds": wait_seconds,
-                               "seconds_per_step": rate, "eta_minutes": (total_attempts - attempts) * rate / 60}
+                               "seconds_per_step": rate, "eta_minutes": (total_attempts - attempts) * rate / 60,
+                               "window_seconds_per_step": (now - last_log_time) / window_steps,
+                               "window_data_wait_seconds_per_step": (wait_seconds - last_log_wait) / window_steps,
+                               "profiled_steps": profiled_steps,
+                               "profile_h2d_ms_per_step": profile_h2d_ms / profiled_steps if profiled_steps else None,
+                               "profile_model_stream_ms_per_step": profile_model_ms / profiled_steps if profiled_steps else None}
                         trajectory.write(json.dumps(row) + "\n")
+                        last_log_time, last_log_step, last_log_wait = now, attempts, wait_seconds
                         logger.info("Train %s: [%d/%d] loss=%.5f wall/step=%.3fs wait/step=%.3fs ETA=%.1fmin",
                                     args.method, attempts, total_attempts, row["loss"], rate,
                                     wait_seconds / max(1, attempts - resumed_attempts), row["eta_minutes"])
+                        logger.info("Recent: wall/step=%.3fs wait/step=%.3fs; profile=%d H2D=%s model_stream=%s ms",
+                                    row["window_seconds_per_step"], row["window_data_wait_seconds_per_step"],
+                                    profiled_steps, row["profile_h2d_ms_per_step"],
+                                    row["profile_model_stream_ms_per_step"])
                 next_batch = 0
                 save_checkpoint(epoch + 1, 0)
                 if cfg.empty_cache_per_epoch:
