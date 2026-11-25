@@ -1,5 +1,11 @@
 # 两台电脑的当前交接记录
 
+## 2026 年 11 月 26 日开题实验
+
+新工作依据 11 月 24 日保存的 26 页开题 PPT。问题、假设、消融及比较规则已登记在[新增规划](research/20261126_proposal_experiments.md)；服务器入口、依赖、恢复与 GitHub 记录命令见[运行手册](PROPOSAL_RUNBOOK.md)。当前没有这批训练或评测的服务器回执。启用 SemanticSTF 时需在服务器的本地路径配置中填写实际数据根目录。先确认两卡上已有队列，必要时用 `--after` 接续。
+
+收到新记录后按种子与条件比较，保留不完整配对及失败。研究依据和既有分数见[实验总表](EXPERIMENT_MASTER.md)；本批本地测试单独记录在[验证记录](../records/analyses/proposal_validation_20261126.md)。
+
 ## 2026 年 11 月 8 日开发接续
 
 新增可执行入口见 [首批与资源安排](RESOURCE_EXPERIMENT_RUNBOOK.md)。

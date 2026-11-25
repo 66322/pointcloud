@@ -91,6 +91,25 @@ def install_treatment(model, image_module, method, protocol):
         raise ValueError("Unsupported training treatment")
     backbone = model.backbone
     freeze_dino(backbone)
+    if protocol.get("proposal_inputs"):
+        if method != "control":
+            from .proposal_model import install_proposal
+            with torch.random.fork_rng(devices=[]):
+                torch.set_rng_state(torch.Generator().manual_seed(protocol["seed"] + 41).get_state())
+                install_proposal(model, image_module, method, protocol)
+        else:
+            # Keep full geometric coordinates through resize/flip, then mask camera evidence.
+            original_assign = image_module.assign_image_feat
+
+            def proposed_control(data, features, patch, missing=None):
+                offsets = data.get("unmix3d_offset", data["offset"]).long()
+                lengths = torch.diff(offsets, prepend=offsets.new_zeros(1))
+                keep = data["lab_keep"].repeat_interleave(lengths, dim=0,
+                                                           output_size=len(data["image_mask"]))
+                return original_assign(dict(data, image_mask=data["image_mask"] & keep),
+                                       features, patch, missing)
+
+            image_module.assign_image_feat = proposed_control
     if method == "local_attention":
         with torch.random.fork_rng(devices=[]):
             torch.set_rng_state(torch.Generator().manual_seed(protocol["seed"] + 41).get_state())

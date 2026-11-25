@@ -26,6 +26,7 @@ def main():
     parser.add_argument("--trained-run", help="Completed lab training directory; install its saved treatment")
     parser.add_argument("--camera-count", type=int, choices=(0, 1, 3, 6), default=6)
     parser.add_argument("--pixel-shift-x", type=float, default=0.0)
+    parser.add_argument("--proposal-condition", help="Named input condition from the proposal matrix")
     parser.add_argument("--allow-upstream-drift", action="store_true",
                         help="Compatibility option; upstream commit is now recorded, not gated")
     args = parser.parse_args()
@@ -43,6 +44,15 @@ def main():
         paths = dict(paths, weight=str(trained_root / "model/model_last.pth"))
         if experiment.get("assignment", "official") != "official":
             raise ValueError("Trained-run evaluation installs its own saved assignment treatment")
+    proposal = bool(trained and trained["protocol"].get("proposal_inputs"))
+    condition = args.proposal_condition or "clean"
+    external = condition == "stf_val"
+    if args.proposal_condition and not proposal:
+        raise ValueError("Named proposal conditions require a proposal-trained checkpoint")
+    if proposal:
+        from .proposal_data import CONDITIONS
+        if (condition not in (*CONDITIONS, "stf_val") or args.camera_count != 6 or args.pixel_shift_x):
+            raise ValueError("Use one registered proposal evaluation condition")
     if args.expected_frames is not None and len(tokens) != args.expected_frames:
         raise ValueError("Token count differs from --expected-frames")
     if args.reference_predictions and len(tokens) != 1:
@@ -85,7 +95,12 @@ def main():
             "seed": experiment.get("seed", 20261101),
             "model.backbone.dinov2_frozen": False,
         })
-        cfg.data.test.data_root = paths["data_root"]
+        cfg.data.test.data_root = paths["semanticstf_root"] if external else paths["data_root"]
+        if proposal:
+            from .proposal_data import configure_fields
+            configure_fields(cfg.data.test)
+            if external:
+                cfg.data.test.type = "ProposalSemanticSTF"
         cfg.resume = False
         cfg = default_setup(cfg)
         # Save EFFECTIVE config after all overrides, including data root.
@@ -143,13 +158,22 @@ def main():
                 return model
 
             def build_test_loader(self):
-                dataset = build_dataset(cfg.data.test)
-                dataset.data_list = select_infos(dataset.data_list, tokens=tokens)
-                from .raw_cache import attach_raw_cache
-                attach_raw_cache(dataset, paths.get("decoded_val_cache"))
+                if external:
+                    from .semanticstf import build_dataset as build_stf
+                    from .common import load_infos
+                    source_front = load_infos(paths["info"])[0]["cams"]["CAM_FRONT"]
+                    dataset = build_stf(cfg.data.test, paths["semanticstf_root"], tokens, source_front)
+                else:
+                    dataset = build_dataset(cfg.data.test)
+                    dataset.data_list = select_infos(dataset.data_list, tokens=tokens)
+                    from .raw_cache import attach_raw_cache
+                    cached = attach_raw_cache(dataset, paths.get("decoded_val_cache"))
+                    if proposal:
+                        from .proposal_data import ProposalReader
+                        dataset.get_data = ProposalReader(dataset, condition, cached)
                 raw_reader = None
                 if args.io_workers:
-                    if type(dataset).__name__ != "NuScenesDataset":
+                    if not external and type(dataset).__name__ != "NuScenesDataset":
                         raise ValueError("Raw I/O prefetch has only been audited for NuScenesDataset")
                     raw_reader = OrderedRawReader(dataset.get_data, len(dataset), args.io_workers)
                     dataset.get_data = raw_reader
@@ -170,10 +194,12 @@ def main():
                 if (Path(__file__).resolve().parents[1] / "snapshot.json").is_file() else None),
             "weight_bytes": Path(paths["weight"]).stat().st_size,
             "tokens": tokens,
-            "torch": torch.__version__, "physical_gpu_requested": args.gpu,
+            "torch": torch.__version__, "gpu_model": torch.cuda.get_device_name(0),
+            "physical_gpu_requested": args.gpu,
             "kind": "trained_checkpoint_full_validation" if trained else "evaluation_intervention_not_retrained_method",
             "training_experiment": trained,
-            "evaluation_condition": condition_description(args.camera_count, args.pixel_shift_x),
+            "evaluation_condition": ({"proposal_condition": condition, "external": external} if proposal
+                                     else condition_description(args.camera_count, args.pixel_shift_x)),
             "execution": {
                 "raw_io_threads": args.io_workers, "prefetch_frames": args.prefetch_frames,
                 "dataloader_processes": 0, "transform_order_and_rng": "original sequential",
@@ -217,7 +243,19 @@ def main():
             "image_cache": image_cache.stats() if image_cache is not None else None,
         })
         from .results import read_test_metrics
-        write_json(output / "summary.json", read_test_metrics(output / "test.log"))
+        if proposal:
+            from .proposal_metrics import evaluate_predictions
+            summary = evaluate_predictions(paths, tokens, output / "result", condition)
+            if not external:
+                summary["upstream_log_miou_pct"] = read_test_metrics(output / "test.log")["miou_pct"]
+                if abs(summary["miou_pct"] - summary["upstream_log_miou_pct"]) > .011:
+                    raise ValueError("Original-point confusion and upstream mIoU disagree")
+            fusion = getattr(tester.model, "lab_fusion", None)
+            if fusion is not None:
+                summary["fusion_diagnostics"] = fusion.diagnostics()
+        else:
+            summary = read_test_metrics(output / "test.log")
+        write_json(output / "summary.json", summary)
         write_json(output / "status.json", {"status": "completed", "ended_at": timestamp()})
     except Exception as error:
         write_json(output / "status.json", {

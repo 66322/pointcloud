@@ -5,6 +5,7 @@ completed same-budget work is reused. Every new GPU job runs from this queue's
 own code/config snapshot and has an independent output directory.
 """
 import argparse
+from collections import deque
 import csv
 import json
 import os
@@ -306,7 +307,9 @@ def write_reports(output, jobs):
     (output / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def execute_queue(output, jobs, frame_count, *, poll_seconds=15):
+def execute_queue(output, jobs, frame_count, *, poll_seconds=15, command_builder=None, reporter=None):
+    command_builder = command_builder or job_command
+    reporter = reporter or write_reports
     by_id, active = {job["id"]: job for job in jobs}, {}
     for job in jobs:
         if job["status"] == "running":
@@ -316,7 +319,7 @@ def execute_queue(output, jobs, frame_count, *, poll_seconds=15):
             active[gpu] = (job, AdoptedProcess(job), None)
     def save():
         atomic_json(output / "queue.json", {"jobs": jobs, "updated_at": timestamp()})
-        write_reports(output, jobs)
+        reporter(output, jobs)
     try:
         save()
         while any(job["status"] not in TERMINAL for job in jobs):
@@ -333,12 +336,19 @@ def execute_queue(output, jobs, frame_count, *, poll_seconds=15):
                     if job["kind"] == "eval" else "optimizer_updates" in result))
                 if (code == 0 and valid_result and status
                         and status.get("status") == "completed"):
+                    if "seed" in job and job["kind"] == "eval":
+                        # Per-class, weather and route evidence stays in each job's summary.
+                        sparse = result.get("groups", {}).get("sparse_support", {})
+                        result = {**{k: result[k] for k in ("miou_pct", "macc_pct", "oa_pct")},
+                                  "sparse_support_miou_pct": sparse.get("miou_pct")}
                     job.update(status="completed", summary=result)
                     print(f"DONE {job['id']}: {job['output']}", flush=True)
                 else:
                     log = Path(job.get("log", ""))
-                    tail = ("\n".join(log.read_text(encoding="utf-8", errors="replace").splitlines()[-25:])
-                            if log.is_file() else "No final completed status/summary")
+                    tail = "No final completed status/summary"
+                    if log.is_file():
+                        with log.open(encoding="utf-8", errors="replace") as stream:
+                            tail = "".join(deque(stream, maxlen=25)).rstrip()
                     job.update(status="failed", error=f"exit={code}; {tail}")
                     print(f"FAILED {job['id']}: independent tasks will continue; {log}", flush=True)
                 job["ended_at"], job["exit_code"] = timestamp(), code
@@ -367,7 +377,7 @@ def execute_queue(output, jobs, frame_count, *, poll_seconds=15):
                     continue
                 ready.pop("gpu_probe_error", None)
                 ready["gpu"] = gpu
-                command = job_command(ready, output, by_id, frame_count)
+                command = command_builder(ready, output, by_id, frame_count)
                 ready["log"] = str(output / "logs" / f"{ready['id']}.log")
                 stream = Path(ready["log"]).open("w", encoding="utf-8")
                 try:
@@ -419,9 +429,20 @@ def main():
     parser.add_argument("--paths", default="configs/paths.local.json")
     parser.add_argument("--plan", default="configs/training/multi_route_queue.json")
     parser.add_argument("--after", help="Wait for this existing batch; reuse completed same-budget work")
-    parser.add_argument("--out", required=True)
+    parser.add_argument("--out")
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--preview", action="store_true", help="Expand a proposal plan without data or a GPU")
+    parser.add_argument("--seed", type=int, action="append", help="Limit a proposal run to registered seed(s)")
+    parser.add_argument("--with-stf", action="store_true", help="Include external single-camera weather validation")
     args = parser.parse_args()
+    if not args.out and not args.preview:
+        parser.error("--out is required for an actual run")
+    source_plan = Path(args.out) / "plan.json" if args.resume else args.plan
+    if read_json(source_plan).get("schema") == "proposal_v1":
+        from .proposal_queue import run
+        return run(args)
+    if args.preview or args.seed or args.with_stf:
+        parser.error("--preview, --seed and --with-stf apply to the proposal plan")
     output = Path(args.out).resolve()
     if args.resume:
         plan = validate_plan(read_json(output / "plan.json"))

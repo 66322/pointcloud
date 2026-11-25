@@ -2,6 +2,13 @@
 
 GitHub main是两台电脑和服务器的共同版本。服务器命令由用户手动执行。
 
+## 2026-11-26 开题新增实验
+
+先看[实验规划](docs/research/20261126_proposal_experiments.md)，再看[双卡运行手册](docs/PROPOSAL_RUNBOOK.md)和[实验配置](configs/training/proposal_20261126.json)。
+本批围绕可拒配对应、质量感知双向融合、邻视角与点云后备设计 14 组模型、3 个训练种子。
+GPU 0/1 各运行一个独立任务，包含 42 次训练、366 次 nuScenes 评测，另可加入 15 次 SemanticSTF 真实天气评测。
+本批状态为本地代码验证完成、服务器待执行。[核心网络](pointcloud_lab/proposal_model.py) · [本地验证](records/analyses/proposal_validation_20261126.md)
+
 **换电脑先读：[交接记录](docs/HANDOFF.md) · [实验总表](docs/EXPERIMENT_MASTER.md) · [完整路线](docs/EXPERIMENT_MATRIX.md)**
 
 2026-11-08 新增 [五组十轮首批与资源安排](docs/RESOURCE_EXPERIMENT_RUNBOOK.md)。
@@ -21,7 +28,7 @@ GitHub main是两台电脑和服务器的共同版本。服务器命令由用户
 
 固定三相机条件下camera_dropout相对control +12.34pp，正常输入−0.16pp。当前两轮clean最佳mean82.47%，未超过历史82.48%；单seed/固定子集结果不作稳定泛化结论。
 
-## 当前操作
+## 11 月既有队列与回执
 
 旧四组及推理r02已经完成。多路线r01机器重启后的两项验证已恢复完成，并自动接续。保持现有队列，不重复启动同名批次。
 

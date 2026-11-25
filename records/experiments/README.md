@@ -4,6 +4,8 @@
 
 ## 当前结果入口
 
+11 月 26 日开题批次的服务器记录待回传。运行中快照存于 `<run_id>/snapshots/`，终态证据存于 `<run_id>/final/`。[生成与同步命令](../../docs/PROPOSAL_RUNBOOK.md) · [本地代码验证](../analyses/proposal_validation_20261126.md)
+
 | 目录 | 已归档的证据 |
 |---|---|
 | [view_assignment_fullval_20261101_r02](view_assignment_fullval_20261101_r02/README.md) | 原权重mean82.64、first82.55；完成回执与结果表 |

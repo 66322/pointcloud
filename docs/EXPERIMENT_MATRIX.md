@@ -1,5 +1,16 @@
 # 完整路线与实际执行矩阵
 
+## 2026-11-26 开题路线
+
+| 路线 | 新增可执行配置 | 验证条件 |
+|---|---|---|
+| 对照与对应 | control、p_lidar、p_center、p_offset、p_geom、p_imgdepth、p_reject | 正常输入、重新投影的旋转和平移 |
+| 局部质量 | p_oneway、p_shared、p_blind、p_asym | 局部暗化、模糊、稀疏和联合退化 |
+| 缺失与后备 | p_neighbor、p_prior、p_distill | 命名三路、全部六个单路和零路 |
+| 外部验证 | control、p_lidar、p_reject、p_asym、p_distill | SemanticSTF val，按真实天气聚合 |
+
+实际模型与条件的逐项组合以[配置矩阵](../configs/training/proposal_20261126.json)为准，记录状态为本地验证。下文中的历史 A/B/C/D、N/M 编号属于早期路线。[新增规划](research/20261126_proposal_experiments.md) · [运行手册](PROPOSAL_RUNBOOK.md)
+
 **2026-11-08 开发新增。** [资源首批](RESOURCE_EXPERIMENT_RUNBOOK.md)
 将 N000、M0、M1、M11、M2 映射为可执行方法。M11 为独立 p=0.5，
 M2 为 k=0…6 均匀保留。五组均十轮、单种子，最多 25 个训练/评测节点。

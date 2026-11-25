@@ -23,6 +23,8 @@ def main():
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     paths, protocol = read_json(args.paths), validate_protocol(read_json(args.protocol))
+    if (protocol.get("proposal_inputs") or args.method.startswith("p_")) and args.method not in protocol["methods"]:
+        raise ValueError("Method is absent from the selected training protocol")
     output = Path(args.out).resolve() if args.resume else fresh_dir(args.out)
     if args.resume:
         saved = read_json(output / "experiment.json")
@@ -63,6 +65,9 @@ def main():
         })
         for split in ("train", "val", "test"):
             cfg.data[split].data_root = paths["data_root"]
+        if protocol.get("proposal_inputs"):
+            from .proposal_data import configure_fields
+            configure_fields(cfg.data.train)
         cfg.hooks = []  # This adapter owns checkpoints/progress; no extra per-epoch validation.
         configure_optimizer(cfg, protocol)
         cfg = default_setup(cfg)
@@ -74,7 +79,10 @@ def main():
         # This is the actual training load, not a separate scan or preflight.
         dataset = build_dataset(cfg.data.train)
         from .raw_cache import attach_raw_cache
-        attach_raw_cache(dataset, paths.get("decoded_train_cache"))
+        cached = attach_raw_cache(dataset, paths.get("decoded_train_cache"))
+        if protocol.get("proposal_inputs"):
+            from .proposal_data import ProposalReader
+            dataset.get_data = ProposalReader(dataset, "train", cached)
         logger.info("Dataset ready: frames=%d workers=%d prefetch=%d decoded_cache=%s",
                     len(dataset), protocol["workers"], protocol["prefetch_factor"],
                     paths.get("decoded_train_cache"))
@@ -141,7 +149,11 @@ def main():
                 read_json(Path(__file__).resolve().parents[1] / "snapshot.json")
                 if (Path(__file__).resolve().parents[1] / "snapshot.json").is_file() else None),
             "upstream_git": git_state(paths["ditr_root"]),
+            "torch": str(torch.__version__), "gpu_model": torch.cuda.get_device_name(0),
             "initial_checkpoint": paths["weight"], "physical_gpu": args.gpu,
+            "initial_weight_name": Path(paths["weight"]).name,
+            "initial_weight_bytes": Path(paths["weight"]).stat().st_size,
+            "upstream_config_name": Path(paths["config"]).name,
             "train_frames_per_epoch": len(dataset), "steps_per_epoch": len(loader),
             "samples_used_per_epoch": len(loader) * protocol["batch_size"],
             "total_attempted_steps": total_attempts, "amp": bool(cfg.enable_amp),

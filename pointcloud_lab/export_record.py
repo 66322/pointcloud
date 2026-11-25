@@ -27,6 +27,10 @@ def export(source, target):
     if queue.is_file() and any(job["status"] in {"pending", "running"}
                                for job in read_json(queue)["jobs"]):
         raise ValueError("Cannot freeze a queue with unfinished jobs")
+    if queue.is_file() and (source / "plan.json").exists() and read_json(
+            source / "plan.json").get("schema") == "proposal_v1":
+        from .proposal_record import export_proposal
+        return export_proposal(source, target)
     files = [source / name for name in ALLOWED if (source / name).is_file()]
     if any(x.stat().st_size > 5_000_000 for x in files) or sum(x.stat().st_size for x in files) > 10_000_000:
         raise ValueError("Evidence bundle too large; review before publication")

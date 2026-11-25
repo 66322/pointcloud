@@ -1,0 +1,112 @@
+{
+  "schema": "proposal_v1",
+  "id": "proposal_20261126",
+  "seeds": [
+    20261101,
+    20261117,
+    20261126
+  ],
+  "protocol": {
+    "id": "proposal_nuscenes_30ep",
+    "epochs": 30,
+    "batch_size": 6,
+    "workers": 4,
+    "prefetch_factor": 1,
+    "profile_steps": 20,
+    "max_lr": 0.0002,
+    "block_lr_ratio": 0.1,
+    "gate_hidden": 32,
+    "camera_dropout": 0.2,
+    "proposal_inputs": true,
+    "methods": ["control", "p_lidar", "p_center", "p_offset", "p_geom", "p_imgdepth", "p_reject", "p_oneway", "p_shared", "p_blind", "p_asym", "p_neighbor", "p_prior", "p_distill"]
+  },
+  "groups": {
+    "alignment": {
+      "methods": ["control", "p_center", "p_offset", "p_geom", "p_imgdepth", "p_reject", "p_distill"],
+      "conditions": ["yaw_m1", "yaw_p1", "yaw_m3", "yaw_p3", "tx_020"]
+    },
+    "quality": {
+      "methods": ["control", "p_reject", "p_oneway", "p_shared", "p_blind", "p_asym", "p_distill"],
+      "conditions": ["dark", "blur", "sparse", "dark_sparse"]
+    },
+    "missing": {
+      "methods": ["control", "p_asym", "p_neighbor", "p_prior", "p_distill"],
+      "conditions": ["triple_a", "triple_b", "only_front", "only_front_right", "only_back_right", "only_back", "only_back_left", "only_front_left", "none"]
+    }
+  },
+  "external_methods": ["control", "p_lidar", "p_reject", "p_asym", "p_distill"],
+  "contrasts": [
+    {
+      "id": "search",
+      "method": "p_offset",
+      "reference": "p_center",
+      "conditions": ["yaw_m3", "yaw_p3"]
+    },
+    {
+      "id": "geometry",
+      "method": "p_geom",
+      "reference": "p_offset",
+      "conditions": ["yaw_m3", "yaw_p3"]
+    },
+    {
+      "id": "image_depth",
+      "method": "p_imgdepth",
+      "reference": "p_geom",
+      "conditions": ["yaw_m3", "yaw_p3"]
+    },
+    {
+      "id": "rejection",
+      "method": "p_reject",
+      "reference": "p_imgdepth",
+      "conditions": ["yaw_m3", "yaw_p3"]
+    },
+    {
+      "id": "reverse",
+      "method": "p_asym",
+      "reference": "p_oneway",
+      "conditions": ["dark", "sparse"]
+    },
+    {
+      "id": "independent_gates",
+      "method": "p_asym",
+      "reference": "p_shared",
+      "conditions": ["dark", "sparse"]
+    },
+    {
+      "id": "quality_cues",
+      "method": "p_asym",
+      "reference": "p_blind",
+      "conditions": ["dark", "sparse"]
+    },
+    {
+      "id": "neighbors",
+      "method": "p_neighbor",
+      "reference": "p_asym",
+      "conditions": ["triple_a", "triple_b"]
+    },
+    {
+      "id": "fallback",
+      "method": "p_prior",
+      "reference": "p_neighbor",
+      "conditions": ["none"]
+    },
+    {
+      "id": "distillation",
+      "method": "p_distill",
+      "reference": "p_prior",
+      "conditions": ["none"]
+    },
+    {
+      "id": "full_clean",
+      "method": "p_distill",
+      "reference": "control",
+      "conditions": ["clean"]
+    },
+    {
+      "id": "external",
+      "method": "p_distill",
+      "reference": "control",
+      "conditions": ["stf_val"]
+    }
+  ]
+}
