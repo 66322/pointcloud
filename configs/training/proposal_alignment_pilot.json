@@ -1,0 +1,67 @@
+{
+  "schema": "proposal_v1",
+  "id": "proposal_alignment_pilot",
+  "seeds": [
+    20261101
+  ],
+  "protocol": {
+    "id": "paired_alignment_2ep",
+    "epochs": 2,
+    "batch_size": 6,
+    "workers": 4,
+    "prefetch_factor": 1,
+    "profile_steps": 20,
+    "max_lr": 0.0002,
+    "block_lr_ratio": 0.1,
+    "gate_hidden": 32,
+    "camera_dropout": 0.2,
+    "proposal_inputs": true,
+    "methods": [
+      "control",
+      "p_center",
+      "p_offset"
+    ],
+    "proposal_training": "alignment"
+  },
+  "groups": {
+    "alignment": {
+      "methods": [
+        "control",
+        "p_center",
+        "p_offset"
+      ],
+      "conditions": [
+        "yaw_m3",
+        "yaw_p3"
+      ]
+    }
+  },
+  "external_methods": [],
+  "contrasts": [
+    {
+      "id": "clean_search",
+      "method": "p_offset",
+      "reference": "p_center",
+      "conditions": [
+        "clean"
+      ]
+    },
+    {
+      "id": "search",
+      "method": "p_offset",
+      "reference": "p_center",
+      "conditions": [
+        "yaw_m3",
+        "yaw_p3"
+      ]
+    },
+    {
+      "id": "center_vs_ditr_clean",
+      "method": "p_center",
+      "reference": "control",
+      "conditions": [
+        "clean"
+      ]
+    }
+  ]
+}

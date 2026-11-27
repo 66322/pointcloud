@@ -1,15 +1,16 @@
 # 完整路线与实际执行矩阵
 
-## 2026-11-26 开题路线
+## 2026-11-26 当前路线
 
-| 路线 | 新增可执行配置 | 验证条件 |
+| 研究路线 | 可执行入口或已有证据 | 状态 |
 |---|---|---|
-| 对照与对应 | control、p_lidar、p_center、p_offset、p_geom、p_imgdepth、p_reject | 正常输入、重新投影的旋转和平移 |
-| 局部质量 | p_oneway、p_shared、p_blind、p_asym | 局部暗化、模糊、稀疏和联合退化 |
-| 缺失与后备 | p_neighbor、p_prior、p_distill | 命名三路、全部六个单路和零路 |
-| 外部验证 | control、p_lidar、p_reject、p_asym、p_distill | SemanticSTF val，按真实天气聚合 |
+| 正常六路融合 | control / mean；旧 mean、center_select、gate 两轮成绩见总表 | 先做单种子十轮；可并入原四种 dropout |
+| 对应误差 | 原 control、固定中心 p_center、局部候选 p_offset，比较 clean 和 ±3° | 独立两轮筛查，旧 +4px 任务仍按原条件解释 |
+| 质量变化 | 原型 p_oneway / p_shared / p_asym / p_blind | 后续按单个问题配对；方向性互补收益需要单独的观测 |
+| 相机缺失 | 历史固定三路的 dropout 对照；同帧全存活视角是可用信息的基线 | p_neighbor 对 p_asym 只反映主视角受限的内部变化。历史视觉证据先做几何统计，时序模型待实现 |
+| 外部天气 | SemanticSTF 读取及原外部评价入口 | 候选确定后按共同类别报告 |
 
-实际模型与条件的逐项组合以[配置矩阵](../configs/training/proposal_20261126.json)为准，记录状态为本地验证。下文中的历史 A/B/C/D、N/M 编号属于早期路线。[新增规划](research/20261126_proposal_experiments.md) · [运行手册](PROPOSAL_RUNBOOK.md)
+[当前计划](research/20261126_proposal_experiments.md) · [运行手册](PROPOSAL_RUNBOOK.md) · [旧矩阵快照](https://github.com/66322/pointcloud/tree/5a79e3cf2787c6beeb1e1a00b82c35d579ec140b)
 
 **2026-11-08 开发新增。** [资源首批](RESOURCE_EXPERIMENT_RUNBOOK.md)
 将 N000、M0、M1、M11、M2 映射为可执行方法。M11 为独立 p=0.5，
@@ -45,7 +46,7 @@ valid_pool/both 的有限填充值修补尚待 CUDA 实测。
 | PAIR-PROJ | 对像素对应偏移是否更稳健 | control/bilinear/local_attention +4px已排队，尚无最终回执 | 与同条件control比较；不是SE(3) |
 | ENG | 有序预取/冻结DINO缓存是否提升执行效率 | 新训练/评价可执行，已有真实日志 | 无独立等价性/加速倍数证据，不为测速重跑旧val |
 
-## 仍未实现或后置的研究部分
+## 11 月 2 日各路线的实现边界（后续进展见页首）
 
 | 路线 | 应验证的问题 | 当前状态 |
 |---|---|---|

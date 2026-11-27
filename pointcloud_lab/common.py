@@ -1,8 +1,10 @@
 import hashlib
 import json
+import os
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
+from time import sleep
 
 
 def read_json(path):
@@ -14,6 +16,19 @@ def write_json(path, value):
         json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + "\n",
         encoding="utf-8",
     )
+
+
+def replace_record(source, destination):
+    """Publish a whole file; Windows readers may briefly hold a deny-delete handle."""
+    for delay in (0.025, 0.1, 0.25, 0.5):
+        try:
+            os.replace(source, destination)
+            return
+        except PermissionError as error:
+            if getattr(error, "winerror", None) not in {5, 32, 33}:
+                raise
+            sleep(delay)
+    os.replace(source, destination)
 
 
 def sha256(path):

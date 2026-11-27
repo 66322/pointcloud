@@ -15,7 +15,7 @@ from pointcloud_lab.common import read_json, write_json
 from pointcloud_lab.export_record import export
 from pointcloud_lab.metrics import confusion
 from pointcloud_lab.proposal_data import (
-    RING, camera_geometry, configure_fields, retained_indices, route_groups,
+    RING, camera_geometry, configure_fields, retained_indices, route_groups, training_condition,
 )
 from pointcloud_lab.proposal_metrics import describe, evaluate_predictions
 from pointcloud_lab.proposal_model import ProposalFusion
@@ -83,6 +83,11 @@ class ProposalInputs(unittest.TestCase):
         stf = {"sensor2lidar_rotation": np.array([[0, 0, 1], [0, 0, 0], [0, 0, 0]])}
         np.testing.assert_allclose(heading_alignment(stf, src) @ [1, 0, 3], [0, 1, 3], atol=1e-6)
 
+    def test_alignment_training_draws_only_clean_and_paired_rotations(self):
+        for draw, expected in ((.1, "clean"), (.6, "yaw_m3"), (.8, "yaw_p3")):
+            with patch("numpy.random.rand", return_value=draw):
+                self.assertEqual(training_condition("alignment"), (expected, None))
+
     def test_reprojection_and_missing_names_are_independent_of_array_order(self):
         names = tuple(reversed(RING))
         cameras = {n: dict(sensor2lidar_rotation=np.eye(3), sensor2lidar_translation=np.zeros(3),
@@ -98,6 +103,14 @@ class ProposalInputs(unittest.TestCase):
         masks = route_groups(subset)
         self.assertTrue(masks["neighbor_only"][0])
         self.assertTrue(masks["fallback"][1])
+        self.assertTrue(masks["no_current_view"][1])
+        # A non-adjacent surviving view is available even though the restricted router falls back.
+        geom = dict(image_mask=np.array([[True, False, True]], dtype=bool),
+                    lab_keep=np.array([[False, False, True]], dtype=bool),
+                    lab_primary=np.array([0]), lab_pose=np.zeros((1, 3, 3, 4)))
+        other = route_groups(geom)
+        self.assertTrue(other["fallback"][0] and other["other_current_only"][0])
+        self.assertFalse(other["no_current_view"][0])
 
     def test_sparse_joint_has_identical_targets_and_transform_keys_survive(self):
         xyz = np.tile([35., 1., .5], (200, 1))
@@ -324,9 +337,19 @@ class ProposalQueueChecks(unittest.TestCase):
         plan = read_json(ROOT / DEFAULT_PLAN)
         with tempfile.TemporaryDirectory() as temp:
             out = Path(temp)
-            protocols, jobs = schedule(plan, out, with_stf=True)
-            self.assertEqual((len(protocols), sum(j["kind"] == "train" for j in jobs), len(jobs)), (3, 42, 423))
-            self.assertEqual(len({j["id"] for j in jobs}), 423)
+            self.assertEqual(plan["seeds"], [20261101])
+            protocols, jobs = schedule(plan, out)
+            self.assertEqual((len(protocols), sum(j["kind"] == "train" for j in jobs), len(jobs)), (1, 3, 12))
+            self.assertEqual(len({j["id"] for j in jobs}), 12)
+            with self.assertRaises(ValueError):
+                schedule(plan, out, with_stf=True)
+            # An explicit follow-up can register another seed and an external comparison.
+            plan["seeds"].append(20261117)
+            self.assertEqual(len(schedule(plan, out)[0]), 1)
+            self.assertEqual(len(schedule(plan, out, plan["seeds"])[0]), 2)
+            plan["external_methods"] = ["control"]
+            _, jobs = schedule(plan, out, with_stf=True)
+            self.assertEqual(sum(j.get("condition") == "stf_val" for j in jobs), 1)
             indexed = {j["id"]: j for j in jobs}
             for job in jobs:
                 job["gpu"] = "1"
@@ -342,7 +365,7 @@ class ProposalQueueChecks(unittest.TestCase):
 
     def test_incomplete_pairs_statistics_and_compact_export(self):
         plan = read_json(ROOT / DEFAULT_PLAN)
-        seeds = plan["seeds"][:2]
+        seeds = plan["seeds"] = [20261101, 20261117]
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "batch"
             out.mkdir()
@@ -352,11 +375,11 @@ class ProposalQueueChecks(unittest.TestCase):
             write_json(out / "provenance.json", {"source_git": {"sha": "execution"}})
             for job in jobs:
                 job["status"] = "blocked"
-                if (job["kind"] == "eval" and job["method"] in {"p_reject", "p_imgdepth"}
+                if (job["kind"] == "eval" and job["method"] in {"p_offset", "p_center"}
                         and job.get("condition") in {"yaw_m3", "yaw_p3"}):
-                    if job["method"] == "p_reject" and job["condition"] == "yaw_m3" and job["seed"] == seeds[1]:
+                    if job["method"] == "p_offset" and job["condition"] == "yaw_m3" and job["seed"] == seeds[1]:
                         continue
-                    job.update(status="completed", summary={"miou_pct": 72. if job["method"] == "p_reject" else 70.,
+                    job.update(status="completed", summary={"miou_pct": 72. if job["method"] == "p_offset" else 70.,
                                                               "oa_pct": 85., "macc_pct": 78.})
                     run = Path(job["output"])
                     run.mkdir(parents=True)
@@ -366,7 +389,7 @@ class ProposalQueueChecks(unittest.TestCase):
                     (run / "model.pth").write_bytes(b"never publish")
             report(out, jobs)
             with (out / "contrasts.csv").open() as f:
-                found = next(row for row in csv.DictReader(f) if row["contrast"] == "rejection")
+                found = next(row for row in csv.DictReader(f) if row["contrast"] == "search")
             self.assertEqual((found["paired_seeds"], found["mean_delta_pp"], found["sample_sd_pp"]), ("1", "2.0", ""))
             write_json(out / "queue.json", {"jobs": jobs, "updated_at": "observed"})
             receipt = Path(tmp) / "receipts/one.json"

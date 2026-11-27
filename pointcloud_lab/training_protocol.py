@@ -12,7 +12,7 @@ METHODS = ("control", "gate", "mean", "camera_dropout",
 def validate_protocol(protocol):
     fields = {"id", "epochs", "batch_size", "workers", "prefetch_factor", "seed",
               "max_lr", "block_lr_ratio", "gate_hidden", "camera_dropout", "methods"}
-    if not fields.issubset(protocol) or set(protocol) - fields - {"profile_steps", "proposal_inputs"}:
+    if not fields.issubset(protocol) or set(protocol) - fields - {"profile_steps", "proposal_inputs", "proposal_training"}:
         raise ValueError(f"Training protocol keys must be {sorted(fields)}")
     for key in ("epochs", "batch_size", "prefetch_factor", "gate_hidden"):
         if not isinstance(protocol[key], int) or protocol[key] < 1:
@@ -28,6 +28,9 @@ def validate_protocol(protocol):
     methods = protocol["methods"]
     if "proposal_inputs" in protocol and protocol["proposal_inputs"] is not True:
         raise ValueError("proposal_inputs must be true when supplied")
+    if "proposal_training" in protocol and (
+            not protocol.get("proposal_inputs") or protocol["proposal_training"] not in {"mixed", "alignment"}):
+        raise ValueError("proposal_training requires proposal inputs and a known training distribution")
     if protocol.get("proposal_inputs"):
         if set(methods) - set(PROPOSAL_METHODS):
             raise ValueError("Proposal training requires its paired methods")

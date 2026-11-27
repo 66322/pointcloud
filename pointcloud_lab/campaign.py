@@ -15,7 +15,7 @@ import subprocess
 import sys
 import time
 
-from .common import fresh_dir, git_state, load_infos, read_json, timestamp, write_json
+from .common import fresh_dir, git_state, load_infos, read_json, replace_record, timestamp, write_json
 from .eval_conditions import condition_description
 from .run_training import training_command, validation_command
 from .training_protocol import validate_protocol
@@ -28,7 +28,7 @@ TERMINAL = DONE | {"failed", "blocked"}
 def atomic_json(path, payload):
     path = Path(path)
     write_json(str(path) + ".tmp", payload)
-    os.replace(str(path) + ".tmp", path)
+    replace_record(str(path) + ".tmp", path)
 
 
 def optional_json(path):
@@ -104,8 +104,8 @@ def same_budget(left, right):
 def reuse_campaign_results(jobs, prior, protocol, paths, tokens):
     """Reuse matching completed nodes from a prior campaign, including its 10ep nodes.
 
-    These existing treatments have unchanged model semantics in resource stage 1.
-    New/repaired model methods are deliberately absent from this reuse allowlist.
+    Only treatments with unchanged implementations are eligible. Evaluation reuse also
+    requires the very same training artifact, validation frames and input condition.
     """
     previous = optional_json(prior / "queue.json")
     old_paths = optional_json(prior / "paths.json")
@@ -116,12 +116,13 @@ def reuse_campaign_results(jobs, prior, protocol, paths, tokens):
         return []
     if optional_json(prior / "tokens.json") != tokens:
         return []
-    allowed = {"control", "camera_dropout", "whole_camera_dropout", "bilinear"}
+    allowed = {"control", "mean", "bilinear", "camera_dropout", "whole_camera_dropout",
+               "camera_dropout_half", "uniform_camera_dropout"}
     by_id = {job["id"]: job for job in jobs}
     old_by_id = {job["id"]: job for job in previous["jobs"]}
     reused = []
     for job in jobs:
-        if job["status"] != "pending" or job["phase"] != "screen" or job["method"] not in allowed:
+        if job["status"] != "pending" or job["phase"] not in {"screen", "robust"} or job["method"] not in allowed:
             continue
         for old in previous["jobs"]:
             if old["status"] not in DONE or (old["kind"], old["method"]) != (job["kind"], job["method"]):
@@ -144,11 +145,12 @@ def reuse_campaign_results(jobs, prior, protocol, paths, tokens):
                 if selected["status"] != "reused" or Path(selected["output"]).resolve() != training.resolve():
                     continue
                 provenance = optional_json(source / "provenance.json")
+                expected = condition_description(job["camera_count"], job["shift_x"])
                 if (not provenance or provenance.get("tokens") != tokens
                         or provenance.get("experiment", {}).get("assignment", "official") != "official"
-                        or provenance.get("evaluation_condition") != condition_description(6, 0)):
-                    continue
-                if old.get("camera_count") != 6 or old.get("shift_x") != 0:
+                        or provenance.get("evaluation_condition") != expected
+                        or old.get("camera_count") != job["camera_count"]
+                        or old.get("shift_x") != job["shift_x"]):
                     continue
             job.update(status="reused", reused_from=str(source), output=str(source), summary=summary,
                        reuse_reason="completed prior campaign; matched method, budget, dataset and evaluation")
@@ -431,27 +433,38 @@ def main():
     parser.add_argument("--after", help="Wait for this existing batch; reuse completed same-budget work")
     parser.add_argument("--out")
     parser.add_argument("--resume", action="store_true")
-    parser.add_argument("--preview", action="store_true", help="Expand a proposal plan without data or a GPU")
-    parser.add_argument("--seed", type=int, action="append", help="Limit a proposal run to registered seed(s)")
+    parser.add_argument("--preview", action="store_true", help="Expand a plan without data or a GPU")
+    parser.add_argument("--seed", type=int, action="append", help="Select registered training seeds explicitly; a native plan has one fixed seed")
     parser.add_argument("--with-stf", action="store_true", help="Include external single-camera weather validation")
     args = parser.parse_args()
     if not args.out and not args.preview:
         parser.error("--out is required for an actual run")
     source_plan = Path(args.out) / "plan.json" if args.resume else args.plan
-    if read_json(source_plan).get("schema") == "proposal_v1":
+    plan = read_json(source_plan)
+    if plan.get("schema") == "proposal_v1":
         from .proposal_queue import run
         return run(args)
-    if args.preview or args.seed or args.with_stf:
-        parser.error("--preview, --seed and --with-stf apply to the proposal plan")
+    plan = validate_plan(plan)
+    seed = plan["screen_protocol"]["seed"]
+    if args.with_stf:
+        parser.error("This plan evaluates nuScenes. External evaluation needs its own comparison plan.")
+    if args.seed is not None and (args.resume or args.seed != [seed]):
+        parser.error(f"This plan has one fixed seed ({seed}); resume uses its saved protocol.")
+    if args.preview:
+        if args.resume:
+            parser.error("--preview takes a plan, not a running queue")
+        jobs = make_jobs(plan, Path("."))
+        training = sum(job["kind"] == "train" for job in jobs)
+        print(f"Seed {seed}; GPU 0/1; {training} train, {len(jobs) - training} eval")
+        print("Methods: " + ", ".join(plan["screen_protocol"]["methods"]))
+        return
     output = Path(args.out).resolve()
     if args.resume:
-        plan = validate_plan(read_json(output / "plan.json"))
         paths = read_json(output / "paths.json")
         prior_value = read_json(output / "provenance.json")["prior_batch"]
         prior = Path(prior_value) if prior_value else None
         jobs = read_json(output / "queue.json")["jobs"]
     else:
-        plan = validate_plan(read_json(args.plan))
         paths = read_json(args.paths)
         prior = Path(args.after).resolve() if args.after else None
         output = fresh_dir(output)

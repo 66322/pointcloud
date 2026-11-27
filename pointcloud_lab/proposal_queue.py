@@ -1,4 +1,4 @@
-"""Expand and execute the predeclared blocked three-seed experiment."""
+"""Run paired proposal comparisons, screening with one registered seed by default."""
 import csv
 from collections import Counter
 from pathlib import Path
@@ -8,16 +8,16 @@ import shutil
 from statistics import mean, stdev
 
 from . import campaign
-from .common import fresh_dir, git_state, load_infos, read_json, timestamp, write_json
+from .common import fresh_dir, git_state, load_infos, read_json, replace_record, timestamp, write_json
 from .proposal_data import CONDITIONS
 from .run_training import training_command, validation_command
 from .training_protocol import PROPOSAL_METHODS, validate_protocol
 
-DEFAULT_PLAN = "configs/training/proposal_20261126.json"
+DEFAULT_PLAN = "configs/training/proposal_alignment_pilot.json"
 
 
 def schedule(plan, output, seeds=None, with_stf=False):
-    seeds = plan["seeds"] if seeds is None else seeds
+    seeds = plan["seeds"][:1] if seeds is None else seeds
     if (not seeds or len(set(seeds)) != len(seeds) or set(seeds) - set(plan["seeds"])
             or len(set(plan["seeds"])) != len(plan["seeds"])):
         raise ValueError("Choose distinct registered training seeds")
@@ -31,6 +31,8 @@ def schedule(plan, output, seeds=None, with_stf=False):
         for method in group["methods"]:
             conditions[method].extend(group["conditions"])
     if with_stf:
+        if not plan["external_methods"]:
+            raise ValueError("This screening plan registers no external evaluation")
         for method in plan["external_methods"]:
             conditions[method].append("stf_val")
     if any(len(v) != len(set(v)) for v in conditions.values()):
@@ -80,7 +82,7 @@ def csv_file(path, rows):
         writer = csv.DictWriter(stream, fieldnames=rows[0])
         writer.writeheader()
         writer.writerows(rows)
-    os.replace(tmp, path)
+    replace_record(tmp, path)
 
 
 def report(output, jobs):
@@ -146,8 +148,8 @@ def run(args):
         prior = selection["after"]
     else:
         plan = read_json(args.plan)
-        seeds = args.seed or plan["seeds"]
-        protocols, jobs = schedule(plan, output, seeds, args.with_stf)
+        protocols, jobs = schedule(plan, output, args.seed, args.with_stf)
+        seeds = [protocol["seed"] for protocol in protocols.values()]
         if args.preview:
             print(f"Seeds {seeds}; GPU 0/1; " + str(dict(Counter(j["kind"] for j in jobs))))
             for group, entries in plan["groups"].items():

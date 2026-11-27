@@ -1,63 +1,26 @@
-# Pointcloud — DITR改进实验
+# 点云论文 · DITR 实验记录
 
-GitHub main是两台电脑和服务器的共同版本。服务器命令由用户手动执行。
+本项目从冻结 DINOv2 图像特征注入 PTv3 的 DITR 出发，考察视觉信息能否提高 nuScenes-lidarseg 的三维逐点分割精度。两台电脑和服务器以 GitHub `main` 同步研究计划、代码和轻量结果。
 
-## 2026-11-26 开题新增实验
-
-先看[实验规划](docs/research/20261126_proposal_experiments.md)，再看[双卡运行手册](docs/PROPOSAL_RUNBOOK.md)和[实验配置](configs/training/proposal_20261126.json)。
-本批围绕可拒配对应、质量感知双向融合、邻视角与点云后备设计 14 组模型、3 个训练种子。
-GPU 0/1 各运行一个独立任务，包含 42 次训练、366 次 nuScenes 评测，另可加入 15 次 SemanticSTF 真实天气评测。
-本批状态为本地代码验证完成、服务器待执行。[核心网络](pointcloud_lab/proposal_model.py) · [本地验证](records/analyses/proposal_validation_20261126.md)
-
-**换电脑先读：[交接记录](docs/HANDOFF.md) · [实验总表](docs/EXPERIMENT_MASTER.md) · [完整路线](docs/EXPERIMENT_MATRIX.md)**
-
-2026-11-08 新增 [五组十轮首批与资源安排](docs/RESOURCE_EXPERIMENT_RUNBOOK.md)。
-含共享解码帧缓存、多进程构建、资源采样与后台接续入口，新增服务器结果待回传。
-
-最新依据：用户2026-11-02回传的服务器输出；最近带时间的完成事件为北京时间14:15:23，随后日志确认下一批已启动。这是回执快照，不是实时监控。
-
-| 实验 | 当前已确认结果 |
+| 要做的事 | 从这里开始 |
 |---|---|
-| 历史完整val基线 | 82.48% mIoU，沿用 |
-| 原权重推理mean / first | 已完成：82.64% / 82.55% |
-| 首批四组两轮微调 | 已完成：control82.20、gate82.21、mean82.47、camera_dropout82.04 |
-| 多路线两轮clean验证 | 11组有结果，valid_pool/valid_both训练失败 |
-| 缺相机验证 | control 3/1/0路=60.79/49.20/36.80；camera_dropout 3路=73.13 |
-| 最近启动任务 | GPU0 camera_dropout 0路；GPU1 camera_dropout 1路 |
-| 十轮训练与4px偏移评价 | 尚无最终结果回传；valid_both十轮已被依赖失败阻断 |
+| 接手项目，查最新回执 | [交接记录](docs/HANDOFF.md) · [实验总表](docs/EXPERIMENT_MASTER.md) |
+| 看本轮问题、对照和证据 | [基于 DITR 的实验计划](docs/research/20261126_proposal_experiments.md) · [论文与代码的数据流](docs/BASELINE_AND_DATAFLOW.md) |
+| 运行或预览 | [双卡运行手册](docs/PROPOSAL_RUNBOOK.md) · [正常六路默认配置](configs/training/proposal_20261126.json) |
+| 找旧实验、失败和逐类结果 | [路线索引](docs/EXPERIMENT_MATRIX.md) · [11 月 8 日五组十轮](docs/RESOURCE_EXPERIMENT_RUNBOOK.md) · [实验回执目录](records/experiments/README.md) |
+| 换电脑、同步回执 | [GitHub 同步约定](docs/GITHUB_SYNC.md) |
 
-固定三相机条件下camera_dropout相对control +12.34pp，正常输入−0.16pp。当前两轮clean最佳mean82.47%，未超过历史82.48%；单seed/固定子集结果不作稳定泛化结论。
+## 当前安排
 
-## 11 月既有队列与回执
+默认使用一个共同种子 20261101，比较正常六路输入时的原 DITR 与有效视角均值，各十轮，每个最终权重评一次完整 6,019 帧。已有两轮结果和匹配的服务器产物优先使用。需要一起跑旧路线时，可选合并队列加入原来的四种 dropout，共享同一个 control。局部对应有独立的两轮筛查；质量门控、时序补偿、蒸馏和跨库泛化根据先期证据安排。三个开题想法各自接受检验。
 
-旧四组及推理r02已经完成。多路线r01机器重启后的两项验证已恢复完成，并自动接续。保持现有队列，不重复启动同名批次。
+| 已有观察 | 可比较的数值 |
+|---|---:|
+| 同一原权重，原赋值 → 有效视角均值 | 82.48% → 82.64% |
+| 两轮微调，正常六路，control → mean | 82.20% → 82.47% |
+| 两轮微调，固定三路，control → camera_dropout | 60.79% → 73.13% |
+| 上一行同一对模型，正常六路 | 82.20% → 82.04% |
 
-~~~bash
-cd /home/jovyan/zzx/pointcloud
-git pull --ff-only
-tail -n 12 runs/_launch/multi_route_20261101_r01/resume_console.log
-~~~
+以上为既有服务器回执，十轮和新筛查的成绩待回传。[原权重推理](records/experiments/view_assignment_fullval_20261101_r02/README.md) · [四组微调](records/experiments/finetune_stage1_20261101_r02/README.md) · [缺失实验](records/experiments/multi_route_20261101_r01/README.md)
 
-日志与完整产物在服务器runs/，GitHub不自动镜像实时进度。恢复边界与查看命令见[队列手册](docs/CAMPAIGN_RUNBOOK.md)；机器重启的实际处理见[恢复记录](records/analyses/campaign_restart_20261102.md)。仅git pull不会更改已保存的任务代码快照。
-
-## 结果与目录
-
-- [推理r02](records/experiments/view_assignment_fullval_20261101_r02/README.md)
-- [四组微调r02](records/experiments/finetune_stage1_20261101_r02/README.md)
-- [多路线r01](records/experiments/multi_route_20261101_r01/README.md)：JSON、CSV、逐类回传、失败和进度快照。
-- [结果解释与校核](records/analyses/results_interpretation_20261102.md)
-- [双电脑同步约定](docs/GITHUB_SYNC.md)
-
-| 目录 | 用途 |
-|---|---|
-| docs/ | 交接、实验问题/协议、操作手册 |
-| configs/ | 实验定义；本机路径放ignored的paths.local.json |
-| pointcloud_lab/ | 实验适配器与汇总代码 |
-| runs/ | 服务器完整输出，不进Git |
-| records/experiments/ | 按run_id组织的轻量依据，进入Git |
-| records/analyses/ | 结论边界、故障与恢复分析 |
-| tests/ | 本地开发检查，不要求服务器每次重跑 |
-
-接受已有82.48%基线；新路径只确认一次可运行后直接实验，不恢复20/100帧关卡或例行哈希扫描。旧离线诊断81.7190%/84.3997%受标签20映射错误影响，不能当有效基线或提升，见[更正](records/analyses/diagnostic_mapping_correction_20261101.md)。
-
-原始DITR、数据、权重、旧预测保持原位置。基于[DITR](https://github.com/RWTHVision/ditr)。
+`configs/` 存实验定义，`pointcloud_lab/` 存训练评测适配器，`scripts/` 存后台入口。服务器由用户执行，仅用 GPU 0、1。机内路径放在忽略提交的 `configs/paths.local.json`，数据、权重和逐点预测保存在服务器。

@@ -1,0 +1,40 @@
+{
+  "id": "ditr_fusion_with_dropout_10ep",
+  "screen_protocol": {
+    "id": "ditr_fusion_with_dropout_10ep",
+    "epochs": 10,
+    "batch_size": 6,
+    "workers": 4,
+    "prefetch_factor": 1,
+    "profile_steps": 20,
+    "seed": 20261101,
+    "max_lr": 0.0002,
+    "block_lr_ratio": 0.1,
+    "gate_hidden": 32,
+    "camera_dropout": 0.2,
+    "methods": [
+      "control",
+      "mean",
+      "camera_dropout",
+      "whole_camera_dropout",
+      "camera_dropout_half",
+      "uniform_camera_dropout"
+    ]
+  },
+  "medium_epochs": 50,
+  "medium_methods": [],
+  "robust_methods": [
+    "control",
+    "camera_dropout",
+    "whole_camera_dropout",
+    "camera_dropout_half",
+    "uniform_camera_dropout"
+  ],
+  "robust_camera_counts": [
+    3,
+    1,
+    0
+  ],
+  "projection_methods": [],
+  "projection_shift_x": 4
+}

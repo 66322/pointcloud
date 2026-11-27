@@ -82,7 +82,8 @@ def main():
         cached = attach_raw_cache(dataset, paths.get("decoded_train_cache"))
         if protocol.get("proposal_inputs"):
             from .proposal_data import ProposalReader
-            dataset.get_data = ProposalReader(dataset, "train", cached)
+            dataset.get_data = ProposalReader(dataset, "train", cached,
+                                              protocol.get("proposal_training", "mixed"))
         logger.info("Dataset ready: frames=%d workers=%d prefetch=%d decoded_cache=%s",
                     len(dataset), protocol["workers"], protocol["prefetch_factor"],
                     paths.get("decoded_train_cache"))

@@ -31,7 +31,11 @@ def snapshot(source, destination):
     with tempfile.TemporaryDirectory(dir=destination.parent) as tmp:
         ready = Path(tmp) / "snapshot.json"
         write_json(ready, payload)
-        os.link(ready, destination)
+        if os.name == "nt":
+            # On Windows rename is atomic and fails when a snapshot already exists.
+            os.rename(ready, destination)
+        else:
+            os.link(ready, destination)
 
 
 def export_proposal(source, target):

@@ -27,11 +27,13 @@ def configure_fields(split):
             step["keys"] = tuple(dict.fromkeys((*step["keys"], *extra)))
 
 
-def training_condition():
+def training_condition(distribution="mixed"):
     # PairedDataset seeds NumPy by (seed, epoch, row) in each worker.
     u = np.random.rand()
     if u < .5:
         return "clean", None
+    if distribution == "alignment":
+        return ("yaw_m3" if u < .75 else "yaw_p3"), None
     if u < .65:
         return np.random.choice(list(ALIGN)), None
     if u < .8:
@@ -124,15 +126,17 @@ def prepare_frame(raw, cameras, condition, keep_names=None):
 
 class ProposalReader:
     """Keep upstream raw reads/cache usable with spawn and ordered eval prefetch."""
-    def __init__(self, dataset, condition, cached=None):
+    def __init__(self, dataset, condition, cached=None, training_distribution="mixed"):
         self.dataset = dataset
         self.reader = cached if cached is not None else partial(type(dataset).get_data, dataset)
         self.condition = condition
+        self.training_distribution = training_distribution
 
     def __call__(self, index):
         raw = self.reader(index)
         info = self.dataset.data_list[index % len(self.dataset.data_list)]
-        condition, keep = training_condition() if self.condition == "train" else (self.condition, None)
+        condition, keep = (training_condition(self.training_distribution) if self.condition == "train"
+                           else (self.condition, None))
         return prepare_frame(raw, info["cams"], condition, keep)
 
 
@@ -142,4 +146,8 @@ def route_groups(geometry):
     direct = mask[np.arange(len(mask)), primary]
     adjacent = geometry["lab_pose"][0, primary, :, 0].astype(bool)
     neighbor = ~direct & (mask & adjacent).any(1)
-    return {"primary": direct, "neighbor_only": neighbor, "fallback": ~(direct | neighbor)}
+    fallback = ~(direct | neighbor)
+    any_current = mask.any(axis=1)
+    # Preserve the historical restricted router group and expose its two distinct cases.
+    return {"primary": direct, "neighbor_only": neighbor, "fallback": fallback,
+            "other_current_only": fallback & any_current, "no_current_view": ~any_current}

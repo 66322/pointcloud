@@ -8,14 +8,12 @@ import unittest
 from unittest.mock import patch
 
 import numpy as np
-import torch
 
 from pointcloud_lab.common import read_json, write_json
 from pointcloud_lab.campaign import make_jobs, reuse_campaign_results, validate_plan
 from pointcloud_lab.export_record import export
 from pointcloud_lab.raw_cache import CachedRawReader, dataset_identity, write_frame
 from pointcloud_lab.resource_monitor import memory_info
-from pointcloud_lab.training_models import AssignmentPolicy
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -90,6 +88,9 @@ class ResourceExecutionTests(unittest.TestCase):
                 CachedRawReader(dataset, root)
 
     def test_new_dropout_methods_control_retention_and_leave_global_rng_untouched(self):
+        import torch
+        from pointcloud_lab.training_models import AssignmentPolicy
+
         features = torch.zeros(2000, 6, 2, 1, 1)
         data = {"offset": torch.arange(1, 2001), "image_mask": torch.ones(2000, 6, dtype=torch.bool)}
         masks = []
@@ -118,6 +119,20 @@ class ResourceExecutionTests(unittest.TestCase):
         self.assertEqual(sum(j["kind"] == "eval" for j in jobs), 20)
         self.assertFalse(any(j["phase"] == "medium" for j in jobs))
 
+    def test_clean_pair_and_combined_queue_keep_one_control_and_the_old_conditions(self):
+        old = read_json(ROOT / "configs/training/resource_stage1.json")
+        for name, trains, evals in (("proposal_20261126", 2, 2), ("fusion_with_legacy_10ep", 6, 21)):
+            plan = validate_plan(read_json(ROOT / f"configs/training/{name}.json"))
+            self.assertEqual(plan["screen_protocol"]["seed"], 20261101)
+            self.assertEqual(plan["screen_protocol"]["epochs"], 10)
+            jobs = make_jobs(plan, Path("/run"))
+            self.assertEqual(sum(j["kind"] == "train" for j in jobs), trains)
+            self.assertEqual(sum(j["kind"] == "eval" for j in jobs), evals)
+            self.assertEqual(sum(j["id"] == "screen_control_train" for j in jobs), 1)
+            if name == "fusion_with_legacy_10ep":
+                self.assertEqual(plan["robust_methods"], old["robust_methods"])
+                self.assertEqual(plan["robust_camera_counts"], old["robust_camera_counts"])
+
     def test_reuses_completed_ten_epoch_campaign_node_but_never_two_epoch_node(self):
         plan = validate_plan(read_json(ROOT / "configs/training/resource_stage1.json"))
         with tempfile.TemporaryDirectory() as tmp:
@@ -140,6 +155,21 @@ class ResourceExecutionTests(unittest.TestCase):
             result = reuse_campaign_results(jobs, prior, plan["screen_protocol"], {"info": "same"}, ["a"])
             self.assertEqual(result, ["screen_control_train"])
             self.assertEqual(jobs[0]["output"], str(train))
+            from pointcloud_lab.eval_conditions import condition_description
+            evaluation = prior / "jobs" / "old_control_cam3"
+            evaluation.mkdir()
+            write_json(evaluation / "status.json", {"status": "completed"})
+            write_json(evaluation / "summary.json", dict(miou_pct=62., macc_pct=70., oa_pct=80.))
+            previous = read_json(prior / "queue.json")
+            previous["jobs"].append(dict(id="old_control_cam3", kind="eval", method="control",
+                                         status="completed", output=str(evaluation), camera_count=3,
+                                         shift_x=0., train_job="medium_control_train"))
+            write_json(prior / "queue.json", previous)
+            for count, expected in ((1, []), (3, ["robust_control_cam3"])):
+                write_json(evaluation / "provenance.json", {"tokens": ["a"],
+                           "evaluation_condition": condition_description(count, 0.)})
+                reused = reuse_campaign_results(jobs, prior, plan["screen_protocol"], {"info": "same"}, ["a"])
+                self.assertEqual(reused, expected)
             protocol["epochs"] = 2
             write_json(train / "experiment.json", {"method": "control", "protocol": protocol})
             jobs = make_jobs(plan, root / "new")
