@@ -6,6 +6,10 @@
 
 日期：2026-11-01（基线来源）；状态补充：2026-11-02。最新结果见[实验总表](EXPERIMENT_MASTER.md)和[HANDOFF](HANDOFF.md)。
 
+## DITR 论文与本项目的上游实现
+
+论文 §4.2 的 nuScenes 训练和推理使用当前样本全部六路相机。§3.1 在一个点落入多个视野时随机选一路 patch；相机均无投影时使用零视觉向量，特征经池化在解码器跳连处注入。上游 f66d1da 的 `assign_image_feat` 循环写入所有有效投影，按输入顺序最后一个有效视角留下。相机读取、逐点赋值和多级注入是三个不同环节。控制缺失时，应先对原相机集合施加同一可用掩码，再讨论剩余视角如何选择。附录 B 表 9 已给出六路训练、推理保留不同数量相机的结果。[正式发表](https://doi.org/10.1109/3DV69130.2026.00178) · [作者全文](https://arxiv.org/html/2503.18944v2) · [相机读取](https://github.com/RWTHVision/ditr/blob/f66d1dadb82e97ded7750567a043e4783305b01c/pointcept/datasets/nuscenes.py) · [特征赋值](https://github.com/RWTHVision/ditr/blob/f66d1dadb82e97ded7750567a043e4783305b01c/pointcept/models/point_transformer_v3/utils.py)
+
 ## 已有记录
 
 来源：用户本轮提供的 DITR_改进实验_代码大模型提示词_v2_20261101.md。

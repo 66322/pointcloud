@@ -1,5 +1,17 @@
 # Pointcloud research workflow
 
+- Start a new experimental question with one shared training seed (default
+  20261101) for the candidate and its matched control. Carry the same seed
+  through early ablations. Add independent seeds only for a selected result
+  whose repeatability matters. Never schedule a blanket three-seed sweep by default.
+- The primary experiment asks whether fusion improves 3D point mIoU on clean
+  nuScenes-lidarseg versus same-budget injected DITR. Record robustness under
+  each named condition separately. Read the baseline paper, pinned upstream
+  code and existing results before treating a proposal-slide mechanism as new.
+- Preserve runnable historical experiments and their receipts. Use one queue
+  across GPU 0/1 for compatible old/new jobs and reuse matched finished nodes.
+  Start from the current plan in docs/research/20261126_proposal_experiments.md.
+
 - User preference (2026-11-01): move directly to experiments. Accept the existing
   82.48% full-val baseline. One frame is enough to check a new executable path;
   do not require 20/100-frame gates or repeat full baseline evaluation.
